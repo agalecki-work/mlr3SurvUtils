@@ -22,7 +22,7 @@
 #'
 #' @seealso
 #' Refer to \code{\link[mlr3]{mlr3}} and \code{\link[mlr3proba]{mlr3proba}} for more information on integrating with the mlr3 framework for survival analysis.
-#'
+#' @name mlr3SurvUtils
+#' @docType package
 #' @keywords package
-#' @name mlr3SurvUtils-package
 NULL
