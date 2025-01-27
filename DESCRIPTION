@@ -1,11 +1,21 @@
 Package: mlr3SurvUtils
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Utility functions for survival data prediction using mlr3
+Version: 0.0.1
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+License: GPL-3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
+Suggests:
+  tinytex
+Imports:
+  dplyr,
+  tidyr,
+  rmarkdown,
+  data.table,
+  survival,
+  mlr3,
+  mlr3proba, 
+  knitr
 RoxygenNote: 7.3.2

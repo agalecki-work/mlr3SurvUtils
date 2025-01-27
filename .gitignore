@@ -9,6 +9,7 @@
 *.pdf
 *.xls
 *.sas7bdat
+*.tex
 
 wip/
 CRIC_prj/_sites/a_*
