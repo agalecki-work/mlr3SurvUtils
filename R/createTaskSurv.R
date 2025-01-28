@@ -133,7 +133,7 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   xtra_cols <- na.omit(c(CCH_subcohort, primary_key))
   keep_cols <- unique(na.omit(c(xtra_cols, event, feature_cols, weight_col, add_to_strata_cols)))
   if (type == "right") keep_cols <- c(keep_cols, time)
-  
+  if (type == "mstate") xtra_cols <- c(xtra_cols, time)
   subset_df <- subset_df[, ..keep_cols]
   traceit("Final subset columns:", keep_cols)
 
