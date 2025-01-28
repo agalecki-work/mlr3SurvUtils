@@ -133,11 +133,8 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   xtra_cols <- na.omit(c(CCH_subcohort, primary_key))
   keep_cols <- unique(na.omit(c(xtra_cols, event, feature_cols, weight_col, add_to_strata_cols)))
   if (type == "right") keep_cols <- c(keep_cols, time)
-  if (type == "mstate"){
-      xtra_cols <- c(xtra_cols, time)
-      xtra_df <- subset_df[, ..xtra_cols]
-      task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
-    }
+  if (type == "mstate") xtra_cols <- c(xtra_cols, time)
+  xtra_df <- subset_df[, ..xtra_cols]
 
   subset_df <- subset_df[, ..keep_cols]
   traceit("Final subset columns:", keep_cols)
@@ -204,7 +201,8 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     }
   }
 
- 
+  if (length(xtra_cols)> 1 ) task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
+
   # Label the task with metadata
   lblx <- c(
     if (!is.null(time_cutoff)) paste0("T_cutoff =", time_cutoff),

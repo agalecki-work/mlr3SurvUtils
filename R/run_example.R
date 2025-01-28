@@ -30,6 +30,7 @@
 #' @export
 run_example <- function(script_prefix = NULL, purl = FALSE) {
   examples_dir <- system.file("examples", package = "mlr3SurvUtils")
+  temp_dir <- tempdir() # Use a temporary directory for file generation
   
   # List all scripts if no prefix is provided
   if (is.null(script_prefix)) {
@@ -40,7 +41,7 @@ run_example <- function(script_prefix = NULL, purl = FALSE) {
     }
     return(scripts)
   }
-  
+
   # Render specific script
   scripts <- list.files(examples_dir, pattern = paste0("^", script_prefix, ".*\\.R$"), full.names = TRUE)
   
@@ -61,39 +62,25 @@ run_example <- function(script_prefix = NULL, purl = FALSE) {
     stop("The 'rmarkdown' package is required but not installed.")
   }
   
-  # Spin the R script into an R Markdown file
+  # Spin the R script into an R Markdown file in a temporary directory
   rmd_file <- knitr::spin(scripts, knit = FALSE)
-  
-  # Render the file to HTML
-  html_file <- rmarkdown::render(rmd_file, output_format = "html_document", quiet = TRUE)
+  rmd_file_temp <- file.path(temp_dir, basename(rmd_file))
+  file.rename(rmd_file, rmd_file_temp)
+
+  # Render the file to HTML in a temporary directory
+  html_file <- rmarkdown::render(rmd_file_temp, output_format = "html_document", quiet = TRUE, output_dir = temp_dir)
   
   # Purl the spun R Markdown file if purl is TRUE
   if (purl) {
-    purl_file <- sub("\\.Rmd$", "-purl.R", basename(rmd_file))
-    knitr::purl(rmd_file, output = purl_file, quiet = TRUE)
-    message("Purled script created: ", purl_file)
+    purl_file <- sub("\\.Rmd$", "-purl.R", basename(rmd_file_temp))
+    purl_file_temp <- file.path(temp_dir, purl_file)
+    knitr::purl(rmd_file_temp, output = purl_file_temp, quiet = TRUE)
+    message("Purled script created: ", purl_file_temp)
   }
   
   # Open the HTML file in the default web browser
-  browseURL(html_file)
-  
-  # Clean up intermediate files
-    unlink(rmd_file)
- 
-  
+  utils::browseURL(html_file)
+
   # Return the path to the HTML file
   return(html_file)
-}
-
-# Helper function to register a file for deletion at session end
-register_cleanup <- function(file) {
-  # Use .Last to remove the HTML file at the end of the session
-  current_last <- .Last
-  .Last <<- function() {
-    if (!is.null(current_last)) current_last()
-    if (file.exists(file)) {
-      unlink(file)
-      message("Removed session-end file: ", file)
-    }
-  }
 }
