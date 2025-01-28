@@ -42,7 +42,7 @@ run_example <- function(script_prefix = NULL, purl = FALSE) {
   }
   
   # Render specific script
-  scripts <- list.files(examples_dir, pattern = paste0("^", script_prefix), full.names = TRUE)
+  scripts <- list.files(examples_dir, pattern = paste0("^", script_prefix, ".*\\.R$"), full.names = TRUE)
   
   if (length(scripts) == 0) {
     stop("No matching script found.")
@@ -76,6 +76,11 @@ run_example <- function(script_prefix = NULL, purl = FALSE) {
   
   # Open the HTML file in the default web browser
   browseURL(html_file)
+  
+  # Clean up intermediate files
+    unlink(rmd_file)
+    on.exit(unlink(html_file), add = TRUE)
+
   
   # Return the path to the HTML file
   return(html_file)

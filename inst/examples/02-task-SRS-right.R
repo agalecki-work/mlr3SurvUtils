@@ -5,7 +5,7 @@
 #' ---
 #' This document was created by `02-task-SRS-right.R` script. It illustrates how to create
 #' mlr3 task for right censored dsts using `createTaskSurv()` function  and how to extract basic info from the task.
-#' (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documenation)
+#' (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documentation)
 #'
 #' ## Setup
 #'
@@ -20,8 +20,9 @@ ls()
 #' First few rows of 'lung' data
 head(lung)
 #' Status/event variable redefined
-lung$status01 = lung$status -1
+lung$status01 <- lung$status -1
 lung$status <- NULL
+
 #' ID (numeric) variable
 lung$id <- 1:nrow(lung)
 
