@@ -79,9 +79,21 @@ run_example <- function(script_prefix = NULL, purl = FALSE) {
   
   # Clean up intermediate files
     unlink(rmd_file)
-    on.exit(unlink(html_file), add = TRUE)
-
+ 
   
   # Return the path to the HTML file
   return(html_file)
+}
+
+# Helper function to register a file for deletion at session end
+register_cleanup <- function(file) {
+  # Use .Last to remove the HTML file at the end of the session
+  current_last <- .Last
+  .Last <<- function() {
+    if (!is.null(current_last)) current_last()
+    if (file.exists(file)) {
+      unlink(file)
+      message("Removed session-end file: ", file)
+    }
+  }
 }
