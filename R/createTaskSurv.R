@@ -110,11 +110,12 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   time <- target_info["time"]
   event <- target_info["event"]
   type <- target_info["type"]
+  if (is.na(type) || is.null(type)) type = "right"
   traceit("target_info:", target_info)
   
   if (!type %in% c("right", "mstate"))  stop("Censoring type: `", type, "` is not supported")
 
-  # Apply time horizon filtering
+  # Apply time cutoff filtering
   subset_df <- apply_time_cutoff(data, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
 
   # "CCH1" filters for subcohort subjects only
@@ -149,7 +150,7 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
 
   # Define roles for columns
   if (event_strata) add_to_strata_cols <- c(add_to_strata_cols, event)
-  target_cols = target_info[c("time", "event")]
+  target_cols = if (type == "right") target_info[c("time", "event")] else target_info["event"]
   traceit("target cols:", target_cols)
 
   roles_list <- list(

@@ -4,7 +4,7 @@
 #' output: html_document
 #' ---
 #' This document was created by `02-task-SRS-right.R` script. It illustrates how to create
-#' mlr3 task for right censored dsts using `createTaskSurv()` function  and how to extract basic info from the task.
+#' mlr3 task for right censored data using `createTaskSurv()` function  and how to extract basic info from the task.
 #' (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documentation)
 #'
 #' ## Setup
@@ -17,8 +17,9 @@ library(mlr3SurvUtils)
 #' Load cancer data
 data(cancer, package="survival")
 ls()
-#' First few rows of 'lung' data
+#' First few rows of `lung` data
 head(lung)
+
 #' Status/event variable redefined
 lung$status01 <- lung$status -1
 lung$status <- NULL
