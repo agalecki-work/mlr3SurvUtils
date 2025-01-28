@@ -139,7 +139,6 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
       task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
     }
 
-  }
   subset_df <- subset_df[, ..keep_cols]
   traceit("Final subset columns:", keep_cols)
 
