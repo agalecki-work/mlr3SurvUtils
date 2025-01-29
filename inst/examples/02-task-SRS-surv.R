@@ -3,9 +3,10 @@
 #' date: Jan. 28, 2025
 #' output: html_document
 #' ---
-#' This document was created by `02-task-SRS-right.R` script. It illustrates how to create
-#' mlr3 task for right censored data using `createTaskSurv()` function  and how to extract basic info from the task.
-#' (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documentation)
+#' This document was created by `02-task-SRS-surv.R` script. It illustrates how to:
+#'
+#' * create mlr3 task for right censored data using `createTaskSurv()` function
+#' * extract basic info from the task (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documentation)
 #'
 #' ## Setup
 #'
@@ -16,7 +17,7 @@ library(mlr3SurvUtils)
 
 #' Load cancer data
 data(cancer, package="survival")
-ls()
+
 #' First few rows of `lung` data
 head(lung)
 
@@ -34,7 +35,7 @@ head(lung)
 
 #' `target_info` is a named vector
 #| echo =TRUE
-(target_info <- c(id = "target1", time = "time", event = "status01", type="right"))
+(target_info <- c(id = "target1", time = "time", event = "status01", task_type="surv"))
 
 #' `backend_info` is a list
 backend_info <- list(

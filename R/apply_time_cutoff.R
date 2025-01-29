@@ -3,11 +3,11 @@
 #' The `apply_time_cutoff` function truncates survival data at a specified time cutoff and returns the modified dataset.
 #'
 #' @param data A data frame containing the survival data.
-#' @param target_info A named vector with elements `id`, `time`, `event`, and `type`:
+#' @param target_info A named vector with elements `id`, `time`, `event`, and `task_type`:
 #'   * `id` : string identifying target
 #'   * `time`: Name of the time column in `data`.
 #'   * `event`: Name of the event column in `data`.
-#'   * `type`: Censoring type, either `"right"` or `"mstate"`.
+#'   * `task_type`: Task type, either `"surv"` or `"classif"`.
 #' @param id Optional. Column name in the data, specifying the individual identifiers. Default is `NULL`.
 #' @param time_cutoff Optional. Numeric value specifying the time cutoff at which to truncate the time variable. If `NULL`, returns the original data.
 #' @param traceon Logical. If `TRUE`, enables tracing for debugging purposes. Default is `FALSE`.
@@ -27,7 +27,7 @@
 #' head(lung)
 #'
 #' # Define the target_info list
-#' target_info <- c(time = "time", event = "status_01", type = "right")
+#' target_info <- c(time = "time", event = "status_01", task_type = "surv")
 #'
 #' # Apply the time cutoff
 #' lungx <- apply_time_cutoff(lung, target_info, time_cutoff = 365)
@@ -59,10 +59,12 @@ apply_time_cutoff <- function(data, target_info, id = NULL, time_cutoff = NULL, 
   time <- target_info["time"]
   event <- target_info["event"]
   
-  type <- target_info["type"]
-  if (is.null(type)) type = "right"
-  if (!type %in% c("right", "mstate")) stop("Censoring type: `", type, "` is not supported")
-
+  task_type <- target_info["task_type"]
+  if (is.null(task_type)) task_type = "surv"
+  type = if (task_type == "surv") "right" else "mstate" 
+  if (!task_type %in% c("surv", "classif")) stop("Task type: `", task_type, "` is not supported")
+  
+ 
   # Prepare survival object based on type
   surv_obj = Surv(data[[time]], data[[event]], type=type)
   traceit("--1 surv_obj:", str(surv_obj))

@@ -1,12 +1,12 @@
-#' Create a Survival or Multistate Task
+#' Create a Survival or Classification Task
 #'
 #' This function creates a survival analysis task using the mlr3proba framework, which can
 #' be configured for various sampling options and feature specifications.
 #' It allows for the inclusion of additional strata or subcohorts according to the provided backend configuration.
 #'
 #' @param data A `data.table` or `data.frame` containing the dataset.
-#' @param target_info A named character vector with keys "id", "time", "event", and "type",
-#'   giving information about the target variable, the time variable, and the type of survival model.
+#' @param target_info A named character vector with keys "id", "time", "event", and "task_type",
+#'   giving information about the target variable, the time variable, and the type of the task.
 #' @param backend_info A list containing configuration options for the backend, including:
 #'   `id`, `option`, `primary_key`, `feature_cols`, `filter`, `time_cutoff`, 
 #'   `CCH_subcohort`, `add_to_strata_cols`, and `weight`.
@@ -15,7 +15,7 @@
 #'
 #' @details
 #' This function supports various sampling options, including simple random sampling (SRS) 
-#' and case-cohort (CCH) designs. Depending on the specified `option`, different metadata 
+#' and case-cohort (CCH) design. Depending on the specified `option`, different metadata 
 #' columns may be included as stratification factors to better support analytical objectives.
 #' 
 #' - **SRS**: If selected, it will use simple random sampling for the entire cohort.
@@ -27,7 +27,7 @@
 #' - **id**: A string identifier for the task target. 
 #' - **time**: The column name in the dataset representing the time-to-event or censoring.
 #' - **event**: The column that indicates if the event of interest has occurred.
-#' - **type**: The type of survival analysis, such as "right" for right-censored data.
+#' - **task_type**: The type of task, such as "surv" for survival data, or "classif" for classification problem.
 #'
 #' The `backend_info` parameter is a configuration list that dictates how the data is processed and includes:
 #' - **id**: A string identifier for the backend task.
@@ -41,7 +41,7 @@
 #' - **weight**: A named vector mapping sampling options to weight column names.
 #'
 #'
-#' @return An object of class `TaskSurv` or `TaskClassif`, depending on the type specified in `target_info`.
+#' @return An object of class `TaskSurv` or `TaskClassif`, depending on the task_type specified in `target_info`.
 #' This object contains the configured task suitable for analysis in the mlr3 framework.
 #'
 #' @examples
@@ -49,7 +49,7 @@
 #' data(cancer, package="survival")
 #' ovarian$id = 1:nrow(ovarian)
 #' 
-#' target_info <- c(id = "tm1", time = "futime", event = "fustat", type = "right")
+#' target_info <- c(id = "tm1", time = "futime", event = "fustat", task_type = "surv")
 #' backend_info <- list(
 #'   id = "ovarian",
 #'   option = "SRS",
@@ -109,11 +109,10 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   target_id <- target_info["id"]
   time <- target_info["time"]
   event <- target_info["event"]
-  type <- target_info["type"]
-  if (is.na(type) || is.null(type)) type = "right"
+  task_type <- target_info["task_type"] # surv or classif
   traceit("target_info:", target_info)
   
-  if (!type %in% c("right", "mstate"))  stop("Censoring type: `", type, "` is not supported")
+  if (!task_type %in% c("surv", "classif"))  stop("Task type: `", task_type, "` is not supported")
 
   # Apply time cutoff filtering
   subset_df <- apply_time_cutoff(data, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
@@ -132,8 +131,8 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   # Prepare columns to retain
   xtra_cols <- na.omit(c(CCH_subcohort, primary_key))
   keep_cols <- unique(na.omit(c(xtra_cols, event, feature_cols, weight_col, add_to_strata_cols)))
-  if (type == "right") keep_cols <- c(keep_cols, time)
-  if (type == "mstate") xtra_cols <- c(xtra_cols, time)
+  if (task_type == "surv") keep_cols <- c(keep_cols, time)
+  if (task_type == "classif") xtra_cols <- c(xtra_cols, time)
   xtra_df <- subset_df[, ..xtra_cols]
 
   subset_df <- subset_df[, ..keep_cols]
@@ -145,14 +144,14 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
 
   # Create the task
   task <- switch(
-    type,
-    "right" = mlr3proba::TaskSurv$new(id = task_id, time = time, event = event, backend = backend, type = "right"),
-    "mstate" = mlr3::TaskClassif$new(id = task_id, backend = backend, target = event)
+    task_type,
+    "surv" = mlr3proba::TaskSurv$new(id = task_id, time = time, event = event, backend = backend, type = "right"),
+    "classif" = mlr3::TaskClassif$new(id = task_id, backend = backend, target = event)
   )
 
   # Define roles for columns
   if (event_strata) add_to_strata_cols <- c(add_to_strata_cols, event)
-  target_cols = if (type == "right") target_info[c("time", "event")] else target_info["event"]
+  target_cols = if (task_type == "surv") target_info[c("time", "event")] else target_info["event"]
   traceit("target cols:", target_cols)
 
   roles_list <- list(

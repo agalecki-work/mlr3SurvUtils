@@ -2,7 +2,7 @@
 % Please edit documentation in R/createTaskSurv.R
 \name{createTaskSurv}
 \alias{createTaskSurv}
-\title{Create a Survival or Multistate Task}
+\title{Create a Survival or Classification Task}
 \usage{
 createTaskSurv(
   data,
@@ -15,8 +15,8 @@ createTaskSurv(
 \arguments{
 \item{data}{A \code{data.table} or \code{data.frame} containing the dataset.}
 
-\item{target_info}{A named character vector with keys "id", "time", "event", and "type",
-giving information about the target variable, the time variable, and the type of survival model.}
+\item{target_info}{A named character vector with keys "id", "time", "event", and "task_type",
+giving information about the target variable, the time variable, and the type of the task.}
 
 \item{backend_info}{A list containing configuration options for the backend, including:
 \code{id}, \code{option}, \code{primary_key}, \code{feature_cols}, \code{filter}, \code{time_cutoff},
@@ -27,7 +27,7 @@ giving information about the target variable, the time variable, and the type of
 \item{traceon}{A logical value indicating whether to print tracing information for debugging (default is \code{FALSE}).}
 }
 \value{
-An object of class \code{TaskSurv} or \code{TaskClassif}, depending on the type specified in \code{target_info}.
+An object of class \code{TaskSurv} or \code{TaskClassif}, depending on the task_type specified in \code{target_info}.
 This object contains the configured task suitable for analysis in the mlr3 framework.
 }
 \description{
@@ -37,7 +37,7 @@ It allows for the inclusion of additional strata or subcohorts according to the 
 }
 \details{
 This function supports various sampling options, including simple random sampling (SRS)
-and case-cohort (CCH) designs. Depending on the specified \code{option}, different metadata
+and case-cohort (CCH) design. Depending on the specified \code{option}, different metadata
 columns may be included as stratification factors to better support analytical objectives.
 \itemize{
 \item \strong{SRS}: If selected, it will use simple random sampling for the entire cohort.
@@ -51,7 +51,7 @@ Each element should correspond to:
 \item \strong{id}: A string identifier for the task target.
 \item \strong{time}: The column name in the dataset representing the time-to-event or censoring.
 \item \strong{event}: The column that indicates if the event of interest has occurred.
-\item \strong{type}: The type of survival analysis, such as "right" for right-censored data.
+\item \strong{task_type}: The type of task, such as "surv" for survival data, or "classif" for classification problem.
 }
 
 The \code{backend_info} parameter is a configuration list that dictates how the data is processed and includes:
@@ -72,7 +72,7 @@ The \code{backend_info} parameter is a configuration list that dictates how the 
 data(cancer, package="survival")
 ovarian$id = 1:nrow(ovarian)
 
-target_info <- c(id = "tm1", time = "futime", event = "fustat", type = "right")
+target_info <- c(id = "tm1", time = "futime", event = "fustat", task_type = "surv")
 backend_info <- list(
   id = "ovarian",
   option = "SRS",

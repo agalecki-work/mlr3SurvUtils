@@ -15,12 +15,12 @@ apply_time_cutoff(
 \arguments{
 \item{data}{A data frame containing the survival data.}
 
-\item{target_info}{A named vector with elements \code{id}, \code{time}, \code{event}, and \code{type}:
+\item{target_info}{A named vector with elements \code{id}, \code{time}, \code{event}, and \code{task_type}:
 \itemize{
 \item \code{id} : string identifying target
 \item \code{time}: Name of the time column in \code{data}.
 \item \code{event}: Name of the event column in \code{data}.
-\item \code{type}: Censoring type, either \code{"right"} or \code{"mstate"}.
+\item \code{task_type}: Task type, either \code{"surv"} or \code{"classif"}.
 }}
 
 \item{id}{Optional. Column name in the data, specifying the individual identifiers. Default is \code{NULL}.}
@@ -48,7 +48,7 @@ lung$status <- NULL
 head(lung)
 
 # Define the target_info list
-target_info <- c(time = "time", event = "status_01", type = "right")
+target_info <- c(time = "time", event = "status_01", task_type = "surv")
 
 # Apply the time cutoff
 lungx <- apply_time_cutoff(lung, target_info, time_cutoff = 365)
