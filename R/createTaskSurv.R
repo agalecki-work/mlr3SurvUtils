@@ -95,6 +95,7 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   
   # Determine weight column based on the option
   weight_col <- backend_info$weight[option]
+  ## if (is.na(weight_col)) weight_col <- NULL
   
   if (option == "SRS") CCH_subcohort <- NULL
 
@@ -114,8 +115,14 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   
   if (!task_type %in% c("surv", "classif"))  stop("Task type: `", task_type, "` is not supported")
 
-  # Apply time cutoff filtering
+  # Apply time cutoff filtering (subset_df initiated)
   subset_df <- apply_time_cutoff(data, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
+  
+  # Rows with valid weight selected 
+  if (length(weight_col)> 0){
+     wghtx <- !is.na(get(weight_col))
+     subset_df <- subset_df[..wghtx, ]  
+  }
 
   # "CCH1" filters for subcohort subjects only
   if (option == "CCH1") {
@@ -128,13 +135,23 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     subset_df <- subset_df[eval(parse(text = filter)), ]
   }
 
-  # Prepare columns to retain
+  # Prepare columns to retain in xtra_df
   xtra_cols <- na.omit(c(CCH_subcohort, primary_key))
   keep_cols <- unique(na.omit(c(xtra_cols, event, feature_cols, weight_col, add_to_strata_cols)))
   if (task_type == "surv") keep_cols <- c(keep_cols, time)
   if (task_type == "classif") xtra_cols <- c(xtra_cols, time)
   xtra_df <- subset_df[, ..xtra_cols]
+  traceit("-- 1. xtra_df", str(xtra_df))
+  eventx <- as.numeric(subset_df[[event]]) - 1
+  aux_df = data.frame(event_temp = eventx)
+  evnt_nm = paste0(event, "_num") 
+  colnames(aux_df) <- evnt_nm
+  traceit("-- 2. aux_df", str(aux_df))
 
+  xtra_df <- cbind(xtra_df, aux_df) 
+  traceit("-- 3. xtra_df", str(xtra_df))
+
+  # 
   subset_df <- subset_df[, ..keep_cols]
   traceit("Final subset columns:", keep_cols)
 
