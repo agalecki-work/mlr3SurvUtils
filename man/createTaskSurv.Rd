@@ -64,7 +64,7 @@ The \code{backend_info} parameter is a configuration list that dictates how the 
 \item \strong{time_cutoff}: A numeric value specifying the time cutoff for survival data.
 \item \strong{CCH_subcohort}: The column name indicating subgroup membership when "CCH" sampling is used.
 \item \strong{add_to_strata_cols}: Additional columns to include in the stratification process.
-\item \strong{weight}: A named vector mapping sampling options to weight column names.
+\item \strong{weight}: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration.
 }
 }
 \examples{

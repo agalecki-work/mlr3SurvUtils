@@ -1,6 +1,6 @@
-#' Calculate Borgan II Weights for a Case-Cohort Study
+#' Calculate Borgan I Weights for a Case-Cohort Study
 #'
-#' This function calculates weights for a case-cohort study using the Borgan II method.
+#' This function calculates weights for a case-cohort study using the Borgan I method.
 #' These weights adjust for the sampling strategy to ensure representative estimates from the subcohort.
 #'
 #' @param data A data frame containing the study data.
@@ -9,10 +9,11 @@
 #' @param sampling_fraction A numeric value representing the proportion of the entire cohort that is sampled to form the subcohort. Default is 0.15.
 #'
 #' @return A numeric vector of weights for each individual in the `data` frame.
-#'
+#' 
 #' @details
 #' The function assigns weights as follows:
-#' - All members of the subcohort, regardless of event status, receive a weight equal to the reciprocal of the sampling fraction.
+#' - Members of the subcohort who did not have the event receive a weight equal to the reciprocal of the sampling fraction.
+#' - Members of the subcohort who had the event receive a weight of 1.
 #' - Non-subcohort members who had the event receive a weight of 1.
 #'
 #' The weights ensure that the sampled subcohort provides unbiased estimates of the full cohort.
@@ -23,14 +24,15 @@
 #' @examples
 #' # Example usage:
 #' df <- data.frame(subcoh = c(1, 0, 1, 0, 1), event = c(0, 1, 1, 1, 0))
-#' weights <- Borgan2_weights(df, "subcoh", "event", 0.15)
+#' weights <- Borgan1_weights(df, "subcoh", "event", 0.15)
 #' print(weights)
 #'
 #' @export
-Borgan2_weights <- function(data, subcoh, event, sampling_fraction=0.15) {
+Borgan1_weights <- function(data, subcoh, event, sampling_fraction=0.15) {
   weight_factor <- 1/sampling_fraction  # weight factor based on sampling fraction
   wt <- rep(NA, times = nrow(data))
-  wt[data[[subcoh]] == 1] <- weight_factor
+  wt[data[[subcoh]] == 1 & data[[event]] == 0] <- weight_factor
+  wt[data[[subcoh]] == 1 & data[[event]] == 1] <- 1
   wt[data[[subcoh]] == 0 & data[[event]] == 1] <- 1
   return(wt)
 }

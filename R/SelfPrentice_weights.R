@@ -1,7 +1,7 @@
-#' Calculate Borgan II Weights for a Case-Cohort Study
+#' Calculate Self-Prentice Weights for a Case-Cohort Study
 #'
-#' This function calculates weights for a case-cohort study using the Borgan II method.
-#' These weights adjust for the sampling strategy to ensure representative estimates from the subcohort.
+#' This function calculates weights for a case-cohort study using the Self-Prentice method.
+#' These weights adjust for the sampling strategy to provide representative estimates from the subcohort.
 #'
 #' @param data A data frame containing the study data.
 #' @param subcoh A string specifying the column name in `data` that identifies whether an observation is part of the subcohort (1 for yes, 0 for no).
@@ -12,25 +12,25 @@
 #'
 #' @details
 #' The function assigns weights as follows:
-#' - All members of the subcohort, regardless of event status, receive a weight equal to the reciprocal of the sampling fraction.
+#' - All subcohort members, regardless of event status, receive a weight equal to the reciprocal of the sampling fraction.
 #' - Non-subcohort members who had the event receive a weight of 1.
 #'
-#' The weights ensure that the sampled subcohort provides unbiased estimates of the full cohort.
+#' The weights ensure that the subcohort offers unbiased estimates of the full cohort.
 #'
 #' @references
-#' Moger, T. A., Pawitan, Y., & Borgan, O. (2008). Case-cohort methods for survival data on families from routine registers. Statistics in Medicine, 27(7), 1062-1074.
+#' Self, S. G., & Prentice, R. L. (1988). Asymptotic Distribution Theory and Efficiency Results for Case-Cohort Studies. Annals of Statistics, 16(1), 64-81.
 #'
 #' @examples
 #' # Example usage:
 #' df <- data.frame(subcoh = c(1, 0, 1, 0, 1), event = c(0, 1, 1, 1, 0))
-#' weights <- Borgan2_weights(df, "subcoh", "event", 0.15)
+#' weights <- SelfPrentice_weights(df, "subcoh", "event", 0.15)
 #' print(weights)
 #'
 #' @export
-Borgan2_weights <- function(data, subcoh, event, sampling_fraction=0.15) {
+SelfPrentice_weights <- function(data, subcoh, event, sampling_fraction=0.15) {
   weight_factor <- 1/sampling_fraction  # weight factor based on sampling fraction
   wt <- rep(NA, times = nrow(data))
-  wt[data[[subcoh]] == 1] <- weight_factor
-  wt[data[[subcoh]] == 0 & data[[event]] == 1] <- 1
+  wt[data[[subcoh]] == 1] <- weight_factor  # Subcohort members
+  wt[data[[subcoh]] == 0 & data[[event]] == 1] <- 1  # Non-subcohort event cases
   return(wt)
 }

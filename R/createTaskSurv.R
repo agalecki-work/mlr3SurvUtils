@@ -38,7 +38,7 @@
 #' - **time_cutoff**: A numeric value specifying the time cutoff for survival data.
 #' - **CCH_subcohort**: The column name indicating subgroup membership when "CCH" sampling is used.
 #' - **add_to_strata_cols**: Additional columns to include in the stratification process.
-#' - **weight**: A named vector mapping sampling options to weight column names.
+#' - **weight**: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration. 
 #'
 #'
 #' @return An object of class `TaskSurv` or `TaskClassif`, depending on the task_type specified in `target_info`.
@@ -80,8 +80,8 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
 
   # Start tracing
   traceit("--- createTaskSurv STARTS")
-  traceit("target_info:", target_info)
-  traceit("backend_info:", backend_info)
+  traceit("1. target_info:", target_info)
+  traceit("2. backend_info:", backend_info)
 
   # Unpack `backend_info` with defaults
   backend_id <- backend_info$id
@@ -95,15 +95,22 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   
   # Determine weight column based on the option
   weight_col <- backend_info$weight[option]
-  ## if (is.na(weight_col)) weight_col <- NULL
   
+  traceit("3. weight_col:", weight_col)
+  
+ 
   if (option == "SRS") CCH_subcohort <- NULL
 
-  # Adjust strata columns for "CCH" option
+  # Adjust strata columns for "CCH" and CCH1 option
+  
   if (option == "CCH") {
+    if (is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort anticipated.")
+    if (is.null(weight_col))  stop(" weight_col is NULL. Column name for weight_col not found.")
     add_to_strata_cols <- c(add_to_strata_cols, CCH_subcohort)
   }
-
+  
+  if (option ==  "CCH1" && is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort anticipated.")
+  
   traceit("backend settings:", c(id = backend_id, option = option, primary_key = primary_key))
 
   # Unpack `target_info`
@@ -111,52 +118,66 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   time <- target_info["time"]
   event <- target_info["event"]
   task_type <- target_info["task_type"] # surv or classif
-  traceit("target_info:", target_info)
   
   if (!task_type %in% c("surv", "classif"))  stop("Task type: `", task_type, "` is not supported")
 
   # Apply time cutoff filtering (subset_df initiated)
   subset_df <- apply_time_cutoff(data, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
-  
-  # Rows with valid weight selected 
-  if (length(weight_col)> 0){
-     wghtx <- !is.na(get(weight_col))
-     subset_df <- subset_df[..wghtx, ]  
-  }
-
-  # "CCH1" filters for subcohort subjects only
-  if (option == "CCH1") {
-    subset_df <- subset_df[subset_df[[CCH_subcohort]] == 1, ]
-    CCH_subcohort <- NULL
-  }
-
+  traceit("4. subset_df after executing `apply_time_cutoff()`:", str(subset_df))
+ 
   # Apply filter if present
   if (!is.null(filter)) {
     subset_df <- subset_df[eval(parse(text = filter)), ]
+    traceit("4.5. subset_df filter applied:", str(subset_df))
+
   }
+
+  # Rows with valid weight selected 
+  if (length(weight_col)> 0){ 
+     subset_df <- subset_df[!is.na(subset_df[[weight_col]]), ] 
+     traceit("4.9  table", table(subset_df[[weight_col]]))
+     traceit("5. subset_df after removing NA weights:", str(subset_df))
+  }
+  
+ 
+  # "CCH1" filters subcohort subjects only
+  if (option == "CCH1") {
+    subset_df <- subset_df[subset_df[[CCH_subcohort]] == 1, ]
+    CCH_subcohort <- NULL
+    traceit("6. subset_df subcohort subjects selected:", str(subset_df))
+  }
+
 
   # Prepare columns to retain in xtra_df
   xtra_cols <- na.omit(c(CCH_subcohort, primary_key))
+  traceit("-- 10. xtra_cols", xtra_cols)
   keep_cols <- unique(na.omit(c(xtra_cols, event, feature_cols, weight_col, add_to_strata_cols)))
   if (task_type == "surv") keep_cols <- c(keep_cols, time)
   if (task_type == "classif") xtra_cols <- c(xtra_cols, time)
-  xtra_df <- subset_df[, ..xtra_cols]
-  traceit("-- 1. xtra_df", str(xtra_df))
+
+  traceit("-- 10.5 xtra_cols", xtra_cols)
+  subset_df <- as.data.table(subset_df)
+  traceit("-- 10.7 str(subset_df)", str(subset_df))
+  xtra_df   <- subset_df[, ..xtra_cols]
+  traceit("-- 11. xtra_df", str(xtra_df))
   eventx <- as.numeric(subset_df[[event]]) - 1
   aux_df = data.frame(event_temp = eventx)
   evnt_nm = paste0(event, "_num") 
   colnames(aux_df) <- evnt_nm
-  traceit("-- 2. aux_df", str(aux_df))
+  traceit("-- 12. aux_df", str(aux_df))
 
-  xtra_df <- cbind(xtra_df, aux_df) 
-  traceit("-- 3. xtra_df", str(xtra_df))
+  if (task_type == "classif") xtra_df <- cbind(xtra_df, aux_df) 
+  traceit("-- 13. xtra_df", str(xtra_df))
 
-  # 
   subset_df <- subset_df[, ..keep_cols]
-  traceit("Final subset columns:", keep_cols)
+  traceit("14. Final subset columns:", keep_cols)
+  subset_df <- as.data.table(subset_df)
+  traceit("-- 15. subset df:", str(subset_df))
 
   # Configure backend and task
   backend <- mlr3::DataBackendDataTable$new(subset_df, primary_key = primary_key)
+  traceit("-- 16. backend created", class(backend))
+
   task_id <- paste0(option, ".", backend_id, ":", target_id)
 
   # Create the task
@@ -165,19 +186,28 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     "surv" = mlr3proba::TaskSurv$new(id = task_id, time = time, event = event, backend = backend, type = "right"),
     "classif" = mlr3::TaskClassif$new(id = task_id, backend = backend, target = event)
   )
+    traceit("-- 16.1. task created", task)
+
+    if (!is.null(weight_col)){
+     weight_col = unname(weight_col)
+     traceit("16.5 weight_col:", weight_col)
+     task$set_col_roles(cols= weight_col, roles = "weight")
+     } 
+  
+  traceit("-- 17. task created", task)
 
   # Define roles for columns
   if (event_strata) add_to_strata_cols <- c(add_to_strata_cols, event)
   target_cols = if (task_type == "surv") target_info[c("time", "event")] else target_info["event"]
-  traceit("target cols:", target_cols)
+  traceit("18. target cols:", target_cols)
 
   roles_list <- list(
     target_cols = target_cols,
-    weight_col = weight_col,
+   # weight_col = weight_col,
     feature_cols = feature_cols,
     stratum_cols = add_to_strata_cols
   )
-  traceit("Column roles:", roles_list)
+  traceit("18. Column roles:", roles_list)
 
   # Assign roles to the task
   column_roles <- list()
@@ -195,11 +225,11 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     }
   }
 
-  if (length(roles_list$weight_col) > 0) {
-    for (col in roles_list$weight_col) {
-      column_roles[[col]] <- union(column_roles[[col]], "weight")
-    }
-  }
+  #if (length(roles_list$weight_col) > 0) {
+  #  for (col in roles_list$weight_col) {
+  #    column_roles[[col]] <- union(column_roles[[col]], "weight")
+  #  }
+  #}
 
   if (length(roles_list$stratum_cols) > 0) {
     for (col in roles_list$stratum_cols) {
@@ -207,27 +237,35 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     }
   }
 
-  traceit("====3")
-  traceit("Column roles before assignment:", roles_list)
+  
+  traceit("20. Column roles before assignment:", roles_list)
 
   # Apply the roles
   if (length(names(column_roles)) > 0) {
     for (col in names(column_roles)) {
+      traceit("--- 20.1 col =", col)
+      traceit("20.2 col, role",  c(col,"=> ", column_roles[[col]]))
       task$set_col_roles(col, role = column_roles[[col]])
     }
   }
+  traceit("21. task after applying column_roles", task)
+  
+  traceit("22. xtra_cols :", xtra_cols)
+  traceit("23. xtra_df", str(xtra_df))
 
   if (length(xtra_cols)> 1 ) task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
+  traceit("24. after adding xtra_df")
+   
 
   # Label the task with metadata
   lblx <- c(
-    if (!is.null(time_cutoff)) paste0("T_cutoff =", time_cutoff),
+    if (!is.null(time_cutoff)) paste0("Time_cutoff =", time_cutoff),
     if (!is.null(filter)) paste0("filter=", filter)
   )
   task$label <- paste(lblx, collapse = ", ")
 
   # Finish
-  traceit("--- Task creation finished")
+  traceit("--- Task creation using `createTaskSurv()` finished")
   return(task)
 }
 

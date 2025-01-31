@@ -43,7 +43,7 @@ backend_info <- list(
    option = "SRS",
    primary_key = "id",
    feature_cols = c("sex", "ph.karno", "pat.karno", "meal.cal", "wt.loss"),
-   filter = "age < 70",
+   filter = "lung$age < 70",
    time_cutoff = 1000,
    add_to_strata_cols = "sex"
  )
