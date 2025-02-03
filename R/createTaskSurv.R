@@ -274,12 +274,16 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   traceit("24. after adding xtra_df")
    
 
-  # Label the task with metadata
+  # Label the task
   lblx <- c(
     if (!is.null(time_cutoff)) paste0("Time_cutoff =", time_cutoff),
     if (!is.null(filter)) paste0("filter = ", filter),
     if (option == "CCH1") "CCH1: subcohort only",
     if (option == "CCH")  "CCH: non-cases outside subcohort excluded"
+    if (length(xtra_cols)> 1 ) {
+        nms = paste(colnames(xtra_df), collapse = ", ")
+        paste0( "extra_df columns: ", nms) 
+    }
   )
   task$label <- paste(lblx, collapse = ", ")
 
