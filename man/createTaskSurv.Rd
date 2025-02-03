@@ -9,6 +9,7 @@ createTaskSurv(
   target_info,
   backend_info = NULL,
   event_strata = TRUE,
+  CCH_weight_FUN = NULL,
   traceon = FALSE
 )
 }
@@ -23,6 +24,8 @@ giving information about the target variable, the time variable, and the type of
 \code{CCH_subcohort}, \code{add_to_strata_cols}, and \code{weight}.}
 
 \item{event_strata}{A logical value indicating whether the \code{event} specified in \code{target_info} should be included in strata (default is \code{TRUE}).}
+
+\item{CCH_weight_FUN}{A string indicating what CCH weights functionwill be applied. Possible values: 'Borgan1', 'Borgan2', 'SelfPrentice'. By default 'Borgan2'}
 
 \item{traceon}{A logical value indicating whether to print tracing information for debugging (default is \code{FALSE}).}
 }
@@ -60,11 +63,11 @@ The \code{backend_info} parameter is a configuration list that dictates how the 
 \item \strong{option}: Specifies the sampling method to use, such as "SRS" (Simple Random Sampling) or "CCH" (Case-Cohort). Option "CCH1" considers subcohort data only.
 \item \strong{primary_key}: The column name used as the unique identifier for the data rows. Column has to be numeric.
 \item \strong{feature_cols}: A vector of column names to be used as predictor features.
-\item \strong{filter}: A string expressing conditions to subset the data, e.g., "BMI < 35".
+\item \strong{filter}: A string expressing conditions to subset the data, e.g., "data$BMI < 35".
 \item \strong{time_cutoff}: A numeric value specifying the time cutoff for survival data.
 \item \strong{CCH_subcohort}: The column name indicating subgroup membership when "CCH" sampling is used.
 \item \strong{add_to_strata_cols}: Additional columns to include in the stratification process.
-\item \strong{weight}: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration.
+\item \strong{weight_col}: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration.
 }
 }
 \examples{
@@ -78,7 +81,7 @@ backend_info <- list(
   option = "SRS",
   primary_key = "id",
   feature_cols = c("age","resid.ds","rx"),
-  filter = "age < 70",
+  filter = "ovarian$age < 70",
   time_cutoff = 1000,
   add_to_strata_cols = "rx"
 )

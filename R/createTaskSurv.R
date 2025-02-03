@@ -11,6 +11,7 @@
 #'   `id`, `option`, `primary_key`, `feature_cols`, `filter`, `time_cutoff`, 
 #'   `CCH_subcohort`, `add_to_strata_cols`, and `weight`.
 #' @param event_strata A logical value indicating whether the `event` specified in `target_info` should be included in strata (default is `TRUE`).
+#' @param CCH_weight_FUN A string indicating what CCH weights functionwill be applied. Possible values: 'Borgan1', 'Borgan2', 'SelfPrentice'. By default 'Borgan2'
 #' @param traceon A logical value indicating whether to print tracing information for debugging (default is `FALSE`).
 #'
 #' @details
@@ -34,11 +35,11 @@
 #' - **option**: Specifies the sampling method to use, such as "SRS" (Simple Random Sampling) or "CCH" (Case-Cohort). Option "CCH1" considers subcohort data only.
 #' - **primary_key**: The column name used as the unique identifier for the data rows. Column has to be numeric.
 #' - **feature_cols**: A vector of column names to be used as predictor features.
-#' - **filter**: A string expressing conditions to subset the data, e.g., "BMI < 35".
+#' - **filter**: A string expressing conditions to subset the data, e.g., "data$BMI < 35".
 #' - **time_cutoff**: A numeric value specifying the time cutoff for survival data.
 #' - **CCH_subcohort**: The column name indicating subgroup membership when "CCH" sampling is used.
 #' - **add_to_strata_cols**: Additional columns to include in the stratification process.
-#' - **weight**: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration. 
+#' - **weight_col**: A named vector mapping sampling options to weight column names. Run `run_example('04') for illustration. 
 #'
 #'
 #' @return An object of class `TaskSurv` or `TaskClassif`, depending on the task_type specified in `target_info`.
@@ -55,7 +56,7 @@
 #'   option = "SRS",
 #'   primary_key = "id",
 #'   feature_cols = c("age","resid.ds","rx"),
-#'   filter = "age < 70",
+#'   filter = "ovarian$age < 70",
 #'   time_cutoff = 1000,
 #'   add_to_strata_cols = "rx"
 #' )
@@ -65,7 +66,7 @@
 #' print(task)
 #'
 #' @export
-createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata = TRUE, traceon = FALSE) {
+createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata = TRUE, CCH_weight_FUN = NULL, traceon = FALSE) {
   # Helper for default values
   `%||%` <- function(a, b) if (!is.null(a)) a else b
   traceit <- function(msg, variable = NULL) {
@@ -94,22 +95,22 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   add_to_strata_cols <- backend_info$add_to_strata_cols
   
   # Determine weight column based on the option
-  weight_col <- backend_info$weight[option]
+  CCH_weight_FUN <- CCH_weight_FUN %||% 'Borgan2'
+  weight_col <- backend_info$weight_col[option]
   
   traceit("3. weight_col:", weight_col)
   
  
   if (option == "SRS") CCH_subcohort <- NULL
 
-  # Adjust strata columns for "CCH" and CCH1 option
+  # Adjust strata columns for "CCH" and "CCH1" option
   
   if (option == "CCH") {
-    if (is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort anticipated.")
-    if (is.null(weight_col))  stop(" weight_col is NULL. Column name for weight_col not found.")
+    if (is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort required.")
     add_to_strata_cols <- c(add_to_strata_cols, CCH_subcohort)
   }
   
-  if (option ==  "CCH1" && is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort anticipated.")
+  if (option ==  "CCH1" && is.null(CCH_subcohort)) stop("CCH_subcohort is NULL. Column name for subcohort required.")
   
   traceit("backend settings:", c(id = backend_id, option = option, primary_key = primary_key))
 
@@ -120,26 +121,42 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   task_type <- target_info["task_type"] # surv or classif
   
   if (!task_type %in% c("surv", "classif"))  stop("Task type: `", task_type, "` is not supported")
+  
+   # Apply filter if present(`subset_df` initiated)
+   traceit("3.1 `filter: ", filter)
+   traceit("3.3 `data` before filter: ", str(data))
+   subset_df <-  if (!is.null(filter)) data[eval(parse(text = filter)), ] else data
+   if (!is.null(filter)) traceit("3.5. `subset_df` filter applied:", str(subset_df))
+    
 
-  # Apply time cutoff filtering (subset_df initiated)
-  subset_df <- apply_time_cutoff(data, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
-  traceit("4. subset_df after executing `apply_time_cutoff()`:", str(subset_df))
- 
-  # Apply filter if present
-  if (!is.null(filter)) {
-    subset_df <- subset_df[eval(parse(text = filter)), ]
-    traceit("4.5. subset_df filter applied:", str(subset_df))
-
-  }
-
+  # Apply time cutoff filtering 
+  subset_df <- apply_time_cutoff(subset_df, target_info, id = NULL, time_cutoff = time_cutoff, traceon = FALSE)
+  traceit("4. `subset_df` after executing `apply_time_cutoff()`:", str(subset_df))
+  
   # Rows with valid weight selected 
-  if (length(weight_col)> 0){ 
-     subset_df <- subset_df[!is.na(subset_df[[weight_col]]), ] 
-     traceit("4.9  table", table(subset_df[[weight_col]]))
-     traceit("5. subset_df after removing NA weights:", str(subset_df))
-  }
+   if (option == "CCH") weight_col0 = weight_col
+   if (length(weight_col) > 0  && option == "CCH"){ 
+      traceit("4.1. weight_col =", weight_col)
+      traceit("4.2. names(subset_df) =",  names(subset_df))
+      if (!weight_col %in% names(subset_df))  stop ("ERROR: weight column: `", weight_col, "` not found!") 
+      subset_df <- subset_df[!is.na(subset_df[[weight_col]]), ] 
+      traceit("4.9. weight column after removing NA weights:", head(subset_df[[weight_col]], n=30))
+   }
   
  
+  if (option == "CCH") { 
+    weight_col <- if  (length(weight_col0)> 0) paste0(weight_col0, "_",CCH_weight_FUN) else CCH_weight_FUN
+    CCH_wght <- switch(CCH_weight_FUN,
+       "Borgan1" = Borgan1_weights(subset_df, subcoh = CCH_subcohort, event_or_status= event,task_type=task_type),
+       "Borgan2" = Borgan2_weights(subset_df, subcoh = CCH_subcohort, event_or_status= event,task_type=task_type),
+       "SelfPrentice" = SelfPrentice_weights(subset_df, subcoh = CCH_subcohort, event_or_status= event,task_type=task_type)
+      )
+       traceit("5.1 CCH_wght freq:", table(CCH_wght, useNA="always"))
+       traceit("5.2 CCH_wght x event table:", table(CCH_wght, event= subset_df[[event]], useNA="always"))
+       subset_df[[weight_col]] <-if  (length(weight_col0)> 0) CCH_wght* subset_df[[weight_col0]] else CCH_wght
+       subset_df <- subset_df[!is.na(subset_df[[weight_col]]), ]
+ } else NULL
+
   # "CCH1" filters subcohort subjects only
   if (option == "CCH1") {
     subset_df <- subset_df[subset_df[[CCH_subcohort]] == 1, ]
@@ -180,7 +197,7 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
 
   task_id <- paste0(option, ".", backend_id, ":", target_id)
 
-  # Create the task
+  #------ Create the task
   task <- switch(
     task_type,
     "surv" = mlr3proba::TaskSurv$new(id = task_id, time = time, event = event, backend = backend, type = "right"),
@@ -189,7 +206,7 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     traceit("-- 16.1. task created", task)
 
     if (!is.null(weight_col)){
-     weight_col = unname(weight_col)
+     # weight_col = unname(weight_col)
      traceit("16.5 weight_col:", weight_col)
      task$set_col_roles(cols= weight_col, roles = "weight")
      } 
@@ -260,7 +277,9 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   # Label the task with metadata
   lblx <- c(
     if (!is.null(time_cutoff)) paste0("Time_cutoff =", time_cutoff),
-    if (!is.null(filter)) paste0("filter=", filter)
+    if (!is.null(filter)) paste0("filter = ", filter),
+    if (option == "CCH1") "CCH1: subcohort only",
+    if (option == "CCH")  "CCH: non-cases outside subcohort excluded"
   )
   task$label <- paste(lblx, collapse = ", ")
 

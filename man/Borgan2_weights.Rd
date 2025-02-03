@@ -2,42 +2,55 @@
 % Please edit documentation in R/Borgan2_weights.R
 \name{Borgan2_weights}
 \alias{Borgan2_weights}
-\title{Calculate Borgan II Weights for a Case-Cohort Study}
+\title{Calculate Borgan II Weights for Case-Cohort Study}
 \usage{
-Borgan2_weights(data, subcoh, event, sampling_fraction = 0.15)
+Borgan2_weights(
+  data,
+  subcoh,
+  event_or_status,
+  sampling_fraction = 0.15,
+  task_type = "surv"
+)
 }
 \arguments{
 \item{data}{A data frame containing the study data.}
 
-\item{subcoh}{A string specifying the column name in \code{data} that identifies whether an observation is part of the subcohort (1 for yes, 0 for no).}
+\item{subcoh}{A string specifying the column name in \code{data} that identifies
+whether an observation is part of the subcohort (1 for yes, 0 for no).}
 
-\item{event}{A string specifying the column name in \code{data} that indicates the occurrence of the event of interest (1 if the event occurred, 0 otherwise).}
+\item{event_or_status}{A string specifying the column name in \code{data} that indicates:
+\itemize{
+\item For \code{task_type = "surv"}, an event indicator (1 if the event occurred, 0 otherwise).
+\item For \code{task_type = "classif"}, the status of observation, which must be a factor.
+}}
 
-\item{sampling_fraction}{A numeric value representing the proportion of the entire cohort that is sampled to form the subcohort. Default is 0.15.}
+\item{sampling_fraction}{A numeric value representing the proportion of the
+entire cohort that is sampled to form the subcohort. Default is 0.15.}
+
+\item{task_type}{A character string indicating the type of task. Options are
+"surv" for survival analysis and "classif" for classification.}
 }
 \value{
 A numeric vector of weights for each individual in the \code{data} frame.
 }
 \description{
-This function calculates weights for a case-cohort study using the Borgan II method.
-These weights adjust for the sampling strategy to ensure representative estimates from the subcohort.
+This function calculates Borgan II weights for either a survival analysis task
+or a classification task in a case-cohort study design, allowing flexible event labels.
 }
 \details{
-The function assigns weights as follows:
-\itemize{
-\item All members of the subcohort, regardless of event status, receive a weight equal to the reciprocal of the sampling fraction.
-\item Non-subcohort members who had the event receive a weight of 1.
-}
-
-The weights ensure that the sampled subcohort provides unbiased estimates of the full cohort.
+This function adjusts weights according to the Borgan II method,
+ensuring representative estimation for each outcome category.
 }
 \examples{
-# Example usage:
-df <- data.frame(subcoh = c(1, 0, 1, 0, 1), event = c(0, 1, 1, 1, 0))
-weights <- Borgan2_weights(df, "subcoh", "event", 0.15)
-print(weights)
+# Survival task example:
+df_surv <- data.frame(subcoh = c(1, 0, 1, 0, 1), event = c(0, 1, 1, 1, 0))
+weights_surv <- Borgan2_weights(df_surv, "subcoh", "event", 0.15, "surv")
+print(weights_surv)
 
-}
-\references{
-Moger, T. A., Pawitan, Y., & Borgan, O. (2008). Case-cohort methods for survival data on families from routine registers. Statistics in Medicine, 27(7), 1062-1074.
+# Classification task example:
+df_classif <- data.frame(subcoh = c(1, 0, 1, 0, 1),
+                 status = factor(c('censored', 'main', 'competing', 'main', 'censored')))
+weights_classif <- Borgan2_weights(df_classif, "subcoh", "status", 0.15, "classif")
+print(weights_classif)
+
 }

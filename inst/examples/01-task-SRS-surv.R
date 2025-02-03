@@ -1,11 +1,11 @@
 #' ---
-#' title: "Create SRS task for right censored data (TaskSurv)"
+#' title: "01. Create SRS task for right censored data (TaskSurv)"
 #' date: Jan. 28, 2025
 #' output: html_document
 #' ---
-#' This document was created by `02-task-SRS-surv.R` script. It illustrates how to:
+#' This document illustrates how to:
 #'
-#' * create mlr3 task for right censored data using `createTaskSurv()` function
+#' * create mlr3 task of `TaskSurv` class for right censored data using `createTaskSurv()` function
 #' * extract basic info from the task (for details see [TaskSurv](https://mlr3proba.mlr-org.com/reference/TaskSurv.html) documentation)
 #'
 #' ## Setup
@@ -84,18 +84,19 @@ range(task$times())
 #' Frequency table for status/event variable
 table(task$status())
 
-#' PH assumption
-#'
-
-#' Error: Task 'SRS.lung:tm1' has missing values in column(s) 'meal.cal', 'pat.karno', 'ph.karno', 'wt.loss', 
-#' but learner 'surv.coxph' does not support this task$prop_haz
-#'  task$prop_haz()  # commented out, it works for small number of predictors, graph?
+#' PH assumption (for small number of predictors)
+#| eval=FALSE
+task$prop_haz()
+#| echo =FALSE
+ cat("Error: Task 'SRS.lung:tm1' has missing values in column(s) 'meal.cal', 'pat.karno', 'ph.karno', 'wt.loss',
+   but learner 'surv.coxph' does not support this")
 
 #' Kaplan
-#'
+ task$kaplan(strata = "sex")
 
- print(task$kaplan(strata = "sex"))
-
+#| fig.cap = "Kaplan-Meier plot"
+ plot(task$kaplan(strata = "sex"))
+ 
 #' Proportion of censored observations across entire dataset
 task$cens_prop()
 

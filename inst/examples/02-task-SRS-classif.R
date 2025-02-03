@@ -1,14 +1,14 @@
 #' ---
-#' title: "Create SRS classification task (TaskClassif)"
+#' title: "02. Create SRS classification task (TaskClassif)"
 #' date: Jan. 28, 2025
 #' output: html_document
 #' ---
-#' This document was created by `03-task-SRS-multiclass.R` script. It illustrates how to:
+#' This document illustrates how to:
 #'
-#' * create `TaskClassif` task using `createTaskClassif()` function. 
-#' * This task can be used to extract data for competing risk model
-#' * how to  extract time variable from the task
-#' * perform competing risk analysis (F-G model) using `cmprsk::crr()` and `survival::coxph()'
+#' * create `TaskClassif` task using `createTaskSurv()` function. 
+#' * This task can be used to extract data to fit competing risk model
+#' * How to  extract time variable from the task
+#' * perform competing risk analysis (F-G model) using `cmprsk::crr()` and `survival::coxph()`
 #' * (for details see [TaskClassif](https://mlr3.mlr-org.com/reference/TaskClassif.html) documentation)
 #'
 #' ## Setup
@@ -51,7 +51,6 @@ backend_info <- list(
    option = "SRS",
    primary_key = "id",
    feature_cols = c("sex", "hgb", "creat", "mspike"),
-   # time_cutoff = 36,
    add_to_strata_cols = "sex"
  )
 
@@ -89,9 +88,13 @@ covx <- model.matrix(~ creat + hgb + mspike, data= crr_data)
 covx1 <- covx[, -1]
 crr(crr_data$etime, crr_data$event_num, covx1) 
 
-#' ## survival
+#' ## survival::finegray
 
+
+#' * `finegray()`  
 library(survival)
 FG_data <- finegray(Surv(etime, event)~ creat + hgb + mspike + sex, data= crr_data, etype ="pcm")
+
+#' * `coxph()`
 coxph_fit <- coxph(Surv(fgstart, fgstop, fgstatus) ~ creat + hgb + mspike + sex, data=FG_data, weights = fgwt)
 summary(coxph_fit)
