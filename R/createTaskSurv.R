@@ -270,7 +270,11 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
   traceit("22. xtra_cols :", xtra_cols)
   traceit("23. xtra_df", str(xtra_df))
 
-  if (length(xtra_cols)> 1 ) task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
+  if (length(xtra_cols)> 1 ){
+    task$extra_args <- c(task$extra_args, list(extra_df = xtra_df))
+    extra_col_nms = paste(colnames(xtra_df), collapse = ", ")
+  
+  }
   traceit("24. after adding xtra_df")
    
 
@@ -279,11 +283,8 @@ createTaskSurv <- function(data, target_info, backend_info = NULL, event_strata 
     if (!is.null(time_cutoff)) paste0("Time_cutoff =", time_cutoff),
     if (!is.null(filter)) paste0("filter = ", filter),
     if (option == "CCH1") "CCH1: subcohort only",
-    if (option == "CCH")  "CCH: non-cases outside subcohort excluded"
-    if (length(xtra_cols)> 1 ) {
-        nms = paste(colnames(xtra_df), collapse = ", ")
-        paste0( "extra_df columns: ", nms) 
-    }
+    if (option == "CCH")  "CCH: non-cases outside subcohort excluded", 
+    if (length(xtra_cols)> 1 ) paste0( "extra_df columns: ", extra_col_nms) 
   )
   task$label <- paste(lblx, collapse = ", ")
 
