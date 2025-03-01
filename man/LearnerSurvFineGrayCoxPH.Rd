@@ -62,16 +62,16 @@ task <- TaskSurv$new("fg_test",
                      time = "survival_time",
                      event = "event_status",
                      type = "mstate")
+print(task)
+part <- partition(task)
 
 # Initialize and train the learner
-learner <- lrn("surv.finegray_coxph")
-learner$train(task)
-
-# Predict and extract results
-pred <- learner$predict(task)
-St <- pred$distr[1:7]$survival(c(0, 10, 20, 30))
-cif <- 1 - St
-print(cif)
+FG_cox <- lrn("surv.finegray_coxph")
+pred <- FG_cox$train(task, part$train)$predict(task, part$test)
+St <- pred$distr[1:5]$survival(c(0, 10, 20, 30))
+CIF <- 1 - St
+cindex <- msr("surv.cindex")
+print(cindex$score(pred))
 
 }
 \concept{Learners}
