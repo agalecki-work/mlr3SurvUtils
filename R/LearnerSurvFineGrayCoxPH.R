@@ -1,94 +1,88 @@
-#' @import R6
-#' @import mlr3
-#' @import mlr3proba
-#' @import survival
-#' @import paradox
-#' @import purrr
-NULL
-
-#' Fine-Gray Survival Learner with Cox Proportional Hazards
+#' @title Fine-Gray Competing Risks Model with Cox Proportional Hazards
 #'
 #' @description
-#' A survival learner implementing the Fine-Gray model for competing risks analysis
-#' using `survival::coxph`. This learner extends the `LearnerSurv` class from 
-#' `mlr3proba` and fits a proportional subdistribution hazards model after 
-#' transforming the data with `survival::finegray`. The main event of interest 
-#' is dynamically set as the second level of the event status factor, with the 
-#' third level treated as a competing risk.
+#' A learner for fitting a Fine-Gray competing risks model using Cox proportional hazards.
+#' This model estimates the subdistribution hazard for a specified event type (e.g., "death")
+#' in the presence of competing events (e.g., "relapse"), incorporating weights if provided.
 #'
-#' @details
-#' The Fine-Gray model estimates the subdistribution hazard of a specific event 
-#' in the presence of competing risks. This implementation uses the standard 
-#' Cox proportional hazards approach without penalization. The event status 
-#' must have at least three levels: censored (first level), main event of 
-#' interest (second level), and competing risk (third level). Predictions 
-#' include the linear predictor (`lp`), crank scores, and distribution (`distr`) 
-#' as survival probabilities over time.
+#' @section Usage:
+#' ```
+#' learner <- LearnerSurvFineGrayCoxPH$new()
+#' ```
 #'
 #' @section Parameters:
-#' The learner supports the following parameters:
-#' \describe{
-#'   \item{ties}{Character, method for handling ties in `coxph`. Options are 
-#'     `"efron"` (default), `"breslow"`, or `"exact"`.}
-#'   \item{iter.max}{Integer, maximum number of iterations for `coxph`. 
-#'     Default is 100, ranging from 1 to 1000.}
-#' }
+#' - `ties`: Character, method for handling ties in the Cox model. Options are "efron" (default),
+#'   "breslow", or "exact".
+#' - `iter.max`: Integer, maximum number of iterations for the Cox model fit (default: 100,
+#'   range: 1-1000).
+#'
+#' @section Predict Types:
+#' - `crank`: Continuous ranking (linear predictor).
+#' - `lp`: Linear predictor.
+#' - `distr`: Survival distribution (as a matrix of survival probabilities).
+#'
+#' @section Properties:
+#' - Supports weights via the `wts` column in the task.
 #'
 #' @section Methods:
-#' \describe{
-#'   \item{`$initialize()`}{Initializes a new instance of the learner.}
-#'   \item{`$train(task)`}{Trains the Fine-Gray model on the provided survival task.}
-#'   \item{`$predict(task)`}{Predicts survival outcomes for new data.}
-#' }
+#' - `new()`: Initialize a new instance of the learner.
+#' - `train(task)`: Train the model on a survival task.
+#' - `predict(task)`: Predict on new data from a trained model.
 #'
-#' @family Learners
+#' @note
+#' This learner relies on `distr6` for distribution handling and `purrr` for functional programming utilities,
+#' which are used indirectly via `mlr3proba` dependencies.
 #'
 #' @examples
-#' library(mlr3)
-#' library(mlr3proba)
-#' 
-#' # Create example data
+#' \dontrun{
 #' set.seed(123)
 #' data <- data.frame(
-#'   survival_time = c(5, 10, 15, 20, 25, 7, 12, 18, 22, 30, 8, 14, 19, 23, 28),
-#'   event_status = c(1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0),
-#'   x1 = c(1, 2, 3, 4, 5, 1.5, 2.5, 3.5, 4.5, 5.5, 2, 3, 4, 5, 6),
-#'   x2 = c(0.5, 1, 1.5, 2, 2.5, 0.7, 1.2, 1.8, 2.3, 2.8, 0.9, 1.4, 1.9, 2.4, 2.9)
+#'   time_to_event = c(5, 10, 15, 20, 25, 7, 12, 18, 22, 30,
+#'                     8, 14, 19, 23, 28, 6, 11, 16, 21, 26),
+#'   outcome = c(1, 2, 0, 1, 0, 1, 1, 2, 0, 1,
+#'               2, 0, 1, 2, 0, 1, 0, 2, 1, 0),
+#'   x1 = c(1, 2, 3, 4, 5, 1.5, 2.5, 3.5, 4.5, 5.5,
+#'          2, 3, 4, 5, 6, 1.2, 2.2, 3.2, 4.2, 5.2),
+#'   x2 = c(0.5, 1, 1.5, 2, 2.5, 0.7, 1.2, 1.8, 2.3, 2.8,
+#'          0.9, 1.4, 1.9, 2.4, 2.9, 0.6, 1.1, 1.6, 2.1, 2.6),
+#'   wts = c(1.0, 1.5, 0.8, 1.2, 1.3, 0.9, 1.1, 1.4, 0.7, 1.6,
+#'           1.0, 1.2, 0.9, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.9)
 #' )
-#' data$event_status <- factor(data$event_status,
-#'                            levels = c(0, 1, 2),
-#'                            labels = c("censored", "death", "relapse"))
+#' data$outcome <- factor(data$outcome, levels = c(0, 1, 2),
+#'                        labels = c("censored", "death", "relapse"))
+#' data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
 #' 
-#' # Create a survival task
-#' task <- TaskSurv$new("fg_test",
-#'                      backend = data,
-#'                      time = "survival_time",
-#'                      event = "event_status",
-#'                      type = "mstate")
-#' print(task)
-#' part <- partition(task)
+#' task <- TaskSurv$new(
+#'   id = "fg_test_standalone_with_weights",
+#'   backend = data,
+#'   time = "time_to_event",
+#'   event = "outcome",
+#'   type = "mstate"
+#' )
+#' task$set_col_roles("wts", "weight")
+#' task$set_col_roles("group", "stratum")
 #' 
-#' # Initialize and train the learner
-#' FG_cox <- lrn("surv.finegray_coxph")
-#' pred <- FG_cox$train(task, part$train)$predict(task, part$test)
-#' St <- pred$distr[1:5]$survival(c(0, 10, 20, 30))
-#' CIF <- 1 - St
-#' cindex <- msr("surv.cindex")
-#' print(cindex$score(pred))
+#' part <- partition(task, ratio = 0.7)
+#' learner <- LearnerSurvFineGrayCoxPH$new()
+#' p <- learner$train(task, part$train)$predict(task, part$test)
+#' }
 #'
+#' @importFrom R6 R6Class
+#' @importFrom mlr3proba LearnerSurv TaskSurv
+#' @importFrom mlr3 partition msr
+#' @importFrom paradox ps p_fct p_int
+#' @importFrom survival finegray coxph survfit
 #' @export
-LearnerSurvFineGrayCoxPH <- R6Class("LearnerSurvFineGrayCoxPH",
-  inherit = LearnerSurv,
+LearnerSurvFineGrayCoxPH <- R6::R6Class("LearnerSurvFineGrayCoxPH",
+  inherit = mlr3proba::LearnerSurv,
   public = list(
-    #' @description
-    #' Initializes a new instance of the Fine-Gray CoxPH survival learner.
-    #' Sets up the parameter set and configures the learner properties.
+    #' @description Initialize a new Fine-Gray Cox PH learner.
     initialize = function() {
-      ps <- ps(
-        ties = p_fct(default = "efron", levels = c("efron", "breslow", "exact"), 
-                    tags = "train"),
-        iter.max = p_int(default = 100L, lower = 1L, upper = 1000L, 
-                        tags = "train")
+      ps <- paradox::ps(
+        ties = paradox::p_fct(default = "efron", levels = c("efron", "breslow", "exact"), 
+                              tags = "train"),
+        iter.max = paradox::p_int(default = 100L, lower = 1L, upper = 1000L, 
+                                  tags = "train")
       )
       
       super$initialize(
@@ -98,8 +92,7 @@ LearnerSurvFineGrayCoxPH <- R6Class("LearnerSurvFineGrayCoxPH",
         predict_types = c("crank", "lp", "distr"),
         properties = "weights",
         packages = c("survival", "distr6", "purrr"),
-        label = "Fine-Gray Competing Risks Model with CoxPH",
-        man = "mlr3proba::mlr_learners_surv.finegray_coxph"
+        label = "Fine-Gray Competing Risks Model with CoxPH"
       )
     }
   ),
@@ -107,82 +100,84 @@ LearnerSurvFineGrayCoxPH <- R6Class("LearnerSurvFineGrayCoxPH",
   private = list(
     basehaz = NULL,
     
+    # Train the Fine-Gray model on a survival task (private method).
+    # @param task A survival task object with time, event, and feature columns.
+    # @return The fitted Cox model.
     .train = function(task) {
       pv <- self$param_set$get_values(tags = "train")
       
-      data <- as.data.frame(task$data())
+      row_ids <- task$row_ids
+      full_data <- as.data.frame(task$backend$data(rows = 1:20, 
+                                                  cols = c(task$target_names, task$feature_names)))
       features <- task$feature_names
       if (length(features) == 0) stop("No features provided!")
       
-      time_col <- "survival_time"
-      event_col <- "event_status"
-      
-      #message("Time column: ", time_col)
-      #message("Event column: ", event_col)
+      time_col <- task$target_names[1]
+      event_col <- task$target_names[2]
       event_levels <- task$levels()[[event_col]]
-      #message("Event levels: ", paste(event_levels, collapse = ", "))
+      
+      full_data$id <- seq_len(nrow(full_data))
+      data <- full_data[row_ids, ]
       
       form <- as.formula(paste("Surv(", time_col, ",", event_col, ") ~", 
-                             paste(features, collapse = " + ")))
-      #message("Formula: ", deparse(form))
-      
+                               paste(c(features, "id"), collapse = " + ")))
       if (length(event_levels) < 3) {
         stop("Event status must have at least 3 levels (censored, main event, competing risk)")
       }
-      target_event <- event_levels[2]
-      competing_event <- event_levels[3]
-      #message("Target event (main): ", target_event)
-      #message("Competing event: ", competing_event)
+      target_event <- event_levels[2]  # "death"
       
-      fg_data <- finegray(form, data = data, etype = target_event)
+      fg_data <- survival::finegray(form, data = data, etype = target_event)
       
       if ("weights" %in% task$properties) {
-        fg_data$fgwt <- task$weights$weight
+        weights_data <- task$weights
+        if (is.null(weights_data) || !"weight" %in% names(weights_data)) {
+          stop("No weights defined in task")
+        }
+        all_weights <- weights_data$weight
+        all_row_ids <- weights_data$row_id
+        weight_map <- setNames(all_weights, all_row_ids)
+        original_weights <- weight_map[as.character(row_ids)]
+        matched_indices <- match(fg_data$id, as.integer(names(weight_map)))
+        fg_data$fgwt <- original_weights[matched_indices]
       }
       
-      model <- exec(survival::coxph,
-                   formula = as.formula(paste("Surv(fgstart, fgstop, fgstatus) ~", 
-                                             paste(features, collapse = " + "))),
-                   data = fg_data,
-                   weights = fg_data$fgwt,
-                   !!!pv)
+      cox_formula <- as.formula(paste("Surv(fgstart, fgstop, fgstatus) ~", 
+                                      paste(features, collapse = " + ")))
+      model <- do.call(survival::coxph, 
+                       args = c(list(formula = cox_formula, 
+                                     data = fg_data, 
+                                     weights = fg_data$fgwt), 
+                                pv))
       
       baseline_data <- as.data.frame(matrix(0, nrow = 1, ncol = length(features)))
       colnames(baseline_data) <- features
-      basehaz <- survfit(model, newdata = baseline_data)
+      basehaz <- survival::survfit(model, newdata = baseline_data)
       private$basehaz <- list(time = basehaz$time, cumhaz = basehaz$cumhaz)
       
       return(model)
     },
     
+    # Predict survival outcomes on new data (private method).
+    # @param task A survival task object with new data to predict on.
+    # @return A list with crank, lp, and distr predictions.
     .predict = function(task) {
       newdata <- as.data.frame(task$data(rows = task$row_ids, cols = task$feature_names))
       
-      lp <- exec(predict, self$model,
-                newdata = newdata,
-                type = "lp")
-      
-      #message("Length of lp: ", length(lp))
-      #message("Length of basehaz$time: ", length(private$basehaz$time))
-      #message("Length of basehaz$cumhaz: ", length(private$basehaz$cumhaz))
+      lp <- predict(self$model, newdata = newdata, type = "lp")
       
       cif <- matrix(NA, nrow = nrow(newdata), ncol = length(private$basehaz$time))
       for (i in seq_along(lp)) {
         cif[i, ] <- 1 - exp(-private$basehaz$cumhaz * exp(lp[i]))
       }
-      #message("Dimensions of cif: ", paste(dim(cif), collapse = " x "))
       
       time_order <- order(private$basehaz$time)
       surv <- 1 - cif[, time_order, drop = FALSE]
-      times <- private$basehaz$time[time_order]
+      colnames(surv) <- private$basehaz$time[time_order]
       
-      #message("Length of times: ", length(times))
-      #message("Dimensions of surv: ", paste(dim(surv), collapse = " x "))
-      
-      .surv_return(
-        times = times,
-        surv = surv,
-        lp = lp
+      list(
+        crank = lp,
+        lp = lp,
+        distr = surv
       )
     }
   )

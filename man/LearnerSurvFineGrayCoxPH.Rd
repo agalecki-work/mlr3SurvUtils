@@ -2,79 +2,93 @@
 % Please edit documentation in R/LearnerSurvFineGrayCoxPH.R
 \name{LearnerSurvFineGrayCoxPH}
 \alias{LearnerSurvFineGrayCoxPH}
-\title{Fine-Gray Survival Learner with Cox Proportional Hazards}
+\title{Fine-Gray Competing Risks Model with Cox Proportional Hazards}
 \description{
-A survival learner implementing the Fine-Gray model for competing risks analysis
-using \code{survival::coxph}. This learner extends the \code{LearnerSurv} class from
-\code{mlr3proba} and fits a proportional subdistribution hazards model after
-transforming the data with \code{survival::finegray}. The main event of interest
-is dynamically set as the second level of the event status factor, with the
-third level treated as a competing risk.
+A learner for fitting a Fine-Gray competing risks model using Cox proportional hazards.
+This model estimates the subdistribution hazard for a specified event type (e.g., "death")
+in the presence of competing events (e.g., "relapse"), incorporating weights if provided.
 }
-\details{
-The Fine-Gray model estimates the subdistribution hazard of a specific event
-in the presence of competing risks. This implementation uses the standard
-Cox proportional hazards approach without penalization. The event status
-must have at least three levels: censored (first level), main event of
-interest (second level), and competing risk (third level). Predictions
-include the linear predictor (\code{lp}), crank scores, and distribution (\code{distr})
-as survival probabilities over time.
+\note{
+This learner relies on \code{distr6} for distribution handling and \code{purrr} for functional programming utilities,
+which are used indirectly via \code{mlr3proba} dependencies.
 }
+\section{Usage}{
+
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{learner <- LearnerSurvFineGrayCoxPH$new()
+}\if{html}{\out{</div>}}
+}
+
 \section{Parameters}{
 
-The learner supports the following parameters:
-\describe{
-\item{ties}{Character, method for handling ties in \code{coxph}. Options are
-\code{"efron"} (default), \code{"breslow"}, or \code{"exact"}.}
-\item{iter.max}{Integer, maximum number of iterations for \code{coxph}.
-Default is 100, ranging from 1 to 1000.}
+\itemize{
+\item \code{ties}: Character, method for handling ties in the Cox model. Options are "efron" (default),
+"breslow", or "exact".
+\item \code{iter.max}: Integer, maximum number of iterations for the Cox model fit (default: 100,
+range: 1-1000).
+}
+}
+
+\section{Predict Types}{
+
+\itemize{
+\item \code{crank}: Continuous ranking (linear predictor).
+\item \code{lp}: Linear predictor.
+\item \code{distr}: Survival distribution (as a matrix of survival probabilities).
+}
+}
+
+\section{Properties}{
+
+\itemize{
+\item Supports weights via the \code{wts} column in the task.
 }
 }
 
 \section{Methods}{
 
-\describe{
-\item{\verb{$initialize()}}{Initializes a new instance of the learner.}
-\item{\verb{$train(task)}}{Trains the Fine-Gray model on the provided survival task.}
-\item{\verb{$predict(task)}}{Predicts survival outcomes for new data.}
+\itemize{
+\item \code{new()}: Initialize a new instance of the learner.
+\item \code{train(task)}: Train the model on a survival task.
+\item \code{predict(task)}: Predict on new data from a trained model.
 }
 }
 
 \examples{
-library(mlr3)
-library(mlr3proba)
-
-# Create example data
+\dontrun{
 set.seed(123)
 data <- data.frame(
-  survival_time = c(5, 10, 15, 20, 25, 7, 12, 18, 22, 30, 8, 14, 19, 23, 28),
-  event_status = c(1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0),
-  x1 = c(1, 2, 3, 4, 5, 1.5, 2.5, 3.5, 4.5, 5.5, 2, 3, 4, 5, 6),
-  x2 = c(0.5, 1, 1.5, 2, 2.5, 0.7, 1.2, 1.8, 2.3, 2.8, 0.9, 1.4, 1.9, 2.4, 2.9)
+  time_to_event = c(5, 10, 15, 20, 25, 7, 12, 18, 22, 30,
+                    8, 14, 19, 23, 28, 6, 11, 16, 21, 26),
+  outcome = c(1, 2, 0, 1, 0, 1, 1, 2, 0, 1,
+              2, 0, 1, 2, 0, 1, 0, 2, 1, 0),
+  x1 = c(1, 2, 3, 4, 5, 1.5, 2.5, 3.5, 4.5, 5.5,
+         2, 3, 4, 5, 6, 1.2, 2.2, 3.2, 4.2, 5.2),
+  x2 = c(0.5, 1, 1.5, 2, 2.5, 0.7, 1.2, 1.8, 2.3, 2.8,
+         0.9, 1.4, 1.9, 2.4, 2.9, 0.6, 1.1, 1.6, 2.1, 2.6),
+  wts = c(1.0, 1.5, 0.8, 1.2, 1.3, 0.9, 1.1, 1.4, 0.7, 1.6,
+          1.0, 1.2, 0.9, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.9)
 )
-data$event_status <- factor(data$event_status,
-                           levels = c(0, 1, 2),
-                           labels = c("censored", "death", "relapse"))
+data$outcome <- factor(data$outcome, levels = c(0, 1, 2),
+                       labels = c("censored", "death", "relapse"))
+data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
 
-# Create a survival task
-task <- TaskSurv$new("fg_test",
-                     backend = data,
-                     time = "survival_time",
-                     event = "event_status",
-                     type = "mstate")
-print(task)
-part <- partition(task)
+task <- TaskSurv$new(
+  id = "fg_test_standalone_with_weights",
+  backend = data,
+  time = "time_to_event",
+  event = "outcome",
+  type = "mstate"
+)
+task$set_col_roles("wts", "weight")
+task$set_col_roles("group", "stratum")
 
-# Initialize and train the learner
-FG_cox <- lrn("surv.finegray_coxph")
-pred <- FG_cox$train(task, part$train)$predict(task, part$test)
-St <- pred$distr[1:5]$survival(c(0, 10, 20, 30))
-CIF <- 1 - St
-cindex <- msr("surv.cindex")
-print(cindex$score(pred))
+part <- partition(task, ratio = 0.7)
+learner <- LearnerSurvFineGrayCoxPH$new()
+p <- learner$train(task, part$train)$predict(task, part$test)
+}
 
 }
-\concept{Learners}
 \section{Super classes}{
 \code{\link[mlr3:Learner]{mlr3::Learner}} -> \code{\link[mlr3proba:LearnerSurv]{mlr3proba::LearnerSurv}} -> \code{LearnerSurvFineGrayCoxPH}
 }
@@ -104,8 +118,7 @@ print(cindex$score(pred))
 \if{html}{\out{<a id="method-LearnerSurvFineGrayCoxPH-new"></a>}}
 \if{latex}{\out{\hypertarget{method-LearnerSurvFineGrayCoxPH-new}{}}}
 \subsection{Method \code{new()}}{
-Initializes a new instance of the Fine-Gray CoxPH survival learner.
-Sets up the parameter set and configures the learner properties.
+Initialize a new Fine-Gray Cox PH learner.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{LearnerSurvFineGrayCoxPH$new()}\if{html}{\out{</div>}}
 }
