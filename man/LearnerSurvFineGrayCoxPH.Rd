@@ -5,12 +5,8 @@
 \title{Fine-Gray Competing Risks Model with Cox Proportional Hazards}
 \description{
 A learner for fitting a Fine-Gray competing risks model using Cox proportional hazards.
-This model estimates the subdistribution hazard for a specified event type (e.g., "death")
-in the presence of competing events (e.g., "relapse"), incorporating weights if provided.
-}
-\note{
-This learner relies on \code{distr6} for distribution handling and \code{purrr} for functional programming utilities,
-which are used indirectly via \code{mlr3proba} dependencies.
+This model estimates the subdistribution hazard for a specified event type in the presence
+of competing events, incorporating weights if provided.
 }
 \section{Usage}{
 
@@ -24,8 +20,12 @@ which are used indirectly via \code{mlr3proba} dependencies.
 \itemize{
 \item \code{ties}: Character, method for handling ties in the Cox model. Options are "efron" (default),
 "breslow", or "exact".
-\item \code{iter.max}: Integer, maximum number of iterations for the Cox model fit (default: 100,
+\item \code{iter.max}: Integer, maximum number of iterations for the Cox model fit (default: 200,
 range: 1-1000).
+\item \code{eps}: Numeric, convergence threshold for the Cox model (default: 1e-9, range: 1e-12 to 1e-4).
+\item \code{robust}: Logical, whether to compute robust variance estimates (default: FALSE).
+\item \code{target_event}: Event type (index or name) to model as the target; defaults to the second level if NULL.
+\item \code{singular.ok}: Logical, whether singular predictors are allowed (default: TRUE).
 }
 }
 
@@ -49,46 +49,14 @@ range: 1-1000).
 
 \itemize{
 \item \code{new()}: Initialize a new instance of the learner.
+\itemize{
+\item No arguments are required; sets up the learner with default parameters.
+}
 \item \code{train(task)}: Train the model on a survival task.
 \item \code{predict(task)}: Predict on new data from a trained model.
 }
 }
 
-\examples{
-\dontrun{
-set.seed(123)
-data <- data.frame(
-  time_to_event = c(5, 10, 15, 20, 25, 7, 12, 18, 22, 30,
-                    8, 14, 19, 23, 28, 6, 11, 16, 21, 26),
-  outcome = c(1, 2, 0, 1, 0, 1, 1, 2, 0, 1,
-              2, 0, 1, 2, 0, 1, 0, 2, 1, 0),
-  x1 = c(1, 2, 3, 4, 5, 1.5, 2.5, 3.5, 4.5, 5.5,
-         2, 3, 4, 5, 6, 1.2, 2.2, 3.2, 4.2, 5.2),
-  x2 = c(0.5, 1, 1.5, 2, 2.5, 0.7, 1.2, 1.8, 2.3, 2.8,
-         0.9, 1.4, 1.9, 2.4, 2.9, 0.6, 1.1, 1.6, 2.1, 2.6),
-  wts = c(1.0, 1.5, 0.8, 1.2, 1.3, 0.9, 1.1, 1.4, 0.7, 1.6,
-          1.0, 1.2, 0.9, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.9)
-)
-data$outcome <- factor(data$outcome, levels = c(0, 1, 2),
-                       labels = c("censored", "death", "relapse"))
-data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
-
-task <- TaskSurv$new(
-  id = "fg_test_standalone_with_weights",
-  backend = data,
-  time = "time_to_event",
-  event = "outcome",
-  type = "mstate"
-)
-task$set_col_roles("wts", "weight")
-task$set_col_roles("group", "stratum")
-
-part <- partition(task, ratio = 0.7)
-learner <- LearnerSurvFineGrayCoxPH$new()
-p <- learner$train(task, part$train)$predict(task, part$test)
-}
-
-}
 \section{Super classes}{
 \code{\link[mlr3:Learner]{mlr3::Learner}} -> \code{\link[mlr3proba:LearnerSurv]{mlr3proba::LearnerSurv}} -> \code{LearnerSurvFineGrayCoxPH}
 }
