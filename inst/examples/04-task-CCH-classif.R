@@ -17,10 +17,10 @@
 library(mlr3SurvUtils)
 library(data.table)
 library(cmprsk)
+library(survival)
 
 
-#' Load `mgus2` data
-data(cancer, package="survival")
+#' Convert `mgus2` data to `data.table`
 (mgus2 <- as.data.table(mgus2))
 
 #' Define subcohort in the `mgus2` data

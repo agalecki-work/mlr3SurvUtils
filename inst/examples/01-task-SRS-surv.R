@@ -12,11 +12,9 @@
 #'
 #' Libraries
 #| echo =TRUE
+library(survival)
 library(mlr3SurvUtils)
 #?mlr3SurvUtils
-
-#' Load cancer data
-data(cancer, package="survival")
 
 #' First few rows of `lung` data
 head(lung)

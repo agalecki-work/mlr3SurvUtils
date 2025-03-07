@@ -20,7 +20,7 @@ library(mlr3misc)
 my_learners <- list()
 
 #' Define a list of alpha values
-alpha_values = c(0.1, 0.25, 0.5, 0.75, 1)
+alpha_values = c(0.1, 0.5, 1)
 
 #' Loop through alpha values and create learners
 for (alpha in alpha_values) {

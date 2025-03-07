@@ -14,10 +14,9 @@
 #' @section Functions:
 #' The package provides the following key functions:
 #' \describe{
-#'   \item{\code{\link{createTaskSurv}}}{Creates mlr3 tasks under different scenarios.}
 #'   \item{\code{\link{Descriptive_stats}}}{Compute descriptive statistics for survival data.}
 #'   \item{\code{\link{create_cvglmnet_extra_args}}}{Prepare extra arguments for `cv.glmnet` that uses training data partition.}
-#'   \item{\code{\link{run_example}}}{Run and render example scripts stored in the package.}
+#'   \item{\code{\link{run_example}}}{Run examples stored in the package.}
 #' }
 #'
 #' @seealso

@@ -23,8 +23,8 @@ dts <- data(package="survival")
 res <- dts$results[, c("Item", "Title")]
 head(res)
 
-#' Load `mgus2` data
-data(cancer, package="survival")
+#' Convert `mgus2` data to `data.table`
+library(survival)
 (mgus2 <- as.data.table(mgus2))
 
 #' Variables derived

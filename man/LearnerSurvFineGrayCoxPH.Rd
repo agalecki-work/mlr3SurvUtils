@@ -3,10 +3,13 @@
 \name{LearnerSurvFineGrayCoxPH}
 \alias{LearnerSurvFineGrayCoxPH}
 \title{Fine-Gray Competing Risks Model with Cox Proportional Hazards}
+\value{
+For \code{predict()}, a list with \code{crank} (numeric), \code{lp} (numeric), and \code{distr}
+(matrix of survival probabilities with times as colnames).
+}
 \description{
 A learner for fitting a Fine-Gray competing risks model using Cox proportional hazards.
-This model estimates the subdistribution hazard for a specified event type in the presence
-of competing events, incorporating weights if provided.
+Estimates subdistribution hazard for a specified event type with competing events, supporting weights.
 }
 \section{Usage}{
 
@@ -18,14 +21,12 @@ of competing events, incorporating weights if provided.
 \section{Parameters}{
 
 \itemize{
-\item \code{ties}: Character, method for handling ties in the Cox model. Options are "efron" (default),
-"breslow", or "exact".
-\item \code{iter.max}: Integer, maximum number of iterations for the Cox model fit (default: 200,
-range: 1-1000).
-\item \code{eps}: Numeric, convergence threshold for the Cox model (default: 1e-9, range: 1e-12 to 1e-4).
-\item \code{robust}: Logical, whether to compute robust variance estimates (default: FALSE).
-\item \code{target_event}: Event type (index or name) to model as the target; defaults to the second level if NULL.
-\item \code{singular.ok}: Logical, whether singular predictors are allowed (default: TRUE).
+\item \code{ties}: Character, method for handling ties ("efron" (default), "breslow", "exact").
+\item \code{iter.max}: Integer, max iterations for Cox fit (default: 20, range: 1-1000).
+\item \code{eps}: Numeric, convergence threshold (default: 1e-9, range: 1e-12 to 1e-4).
+\item \code{robust}: Logical, compute robust variance (default: FALSE).
+\item \code{target_event}: Event type to model (default: second level if NULL).
+\item \code{singular.ok}: Logical, allow singular predictors (default: TRUE).
 }
 }
 
@@ -34,24 +35,21 @@ range: 1-1000).
 \itemize{
 \item \code{crank}: Continuous ranking (linear predictor).
 \item \code{lp}: Linear predictor.
-\item \code{distr}: Survival distribution (as a matrix of survival probabilities).
+\item \code{distr}: Survival probabilities (matrix with times as colnames).
 }
 }
 
 \section{Properties}{
 
 \itemize{
-\item Supports weights via the \code{wts} column in the task.
+\item Supports observation weights via the task's weights role (set via \code{weights} argument or \verb{$set_col_roles()}).
 }
 }
 
 \section{Methods}{
 
 \itemize{
-\item \code{new()}: Initialize a new instance of the learner.
-\itemize{
-\item No arguments are required; sets up the learner with default parameters.
-}
+\item \code{new()}: Alias for \code{initialize()}, creates a new instance of the learner with default parameters.
 \item \code{train(task)}: Train the model on a survival task.
 \item \code{predict(task)}: Predict on new data from a trained model.
 }
@@ -86,7 +84,8 @@ range: 1-1000).
 \if{html}{\out{<a id="method-LearnerSurvFineGrayCoxPH-new"></a>}}
 \if{latex}{\out{\hypertarget{method-LearnerSurvFineGrayCoxPH-new}{}}}
 \subsection{Method \code{new()}}{
-Initialize a new Fine-Gray Cox PH learner.
+Initialize a new Fine-Gray Cox PH learner with its default hyperparameter settings.
+No arguments are required; hyperparameters are defined and set via the \code{paradox} parameter set.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{LearnerSurvFineGrayCoxPH$new()}\if{html}{\out{</div>}}
 }

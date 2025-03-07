@@ -38,10 +38,12 @@ surv_tasks[task_type == "surv", c("key", "label", "nrow", "ncol")]
 library(mlr3)
 library(mlr3proba)
 library(mlr3extralearners)
-
+library(mlr3SurvUtils)
 
 #' all learners <DictionaryLearner>
 lrn()     # mlr_learners
+surv_learners <- mlr_learners$keys(pattern = "surv")
+print(sort(surv_learners))
 
 #' help pages for selected learner
 #| eval=FALSE

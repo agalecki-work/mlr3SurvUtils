@@ -13,47 +13,64 @@ apply_time_cutoff(
 )
 }
 \arguments{
-\item{data}{A data frame containing the survival data.}
+\item{data}{A data frame containing survival data.}
 
-\item{target_info}{A named vector with elements \code{id}, \code{time}, \code{event}, and \code{task_type}:
+\item{target_info}{A named character vector with keys:
 \itemize{
-\item \code{id} : string identifying target
-\item \code{time}: Name of the time column in \code{data}.
-\item \code{event}: Name of the event column in \code{data}.
-\item \code{task_type}: Task type, either \code{"surv"} or \code{"classif"}.
+\item \code{id}: A string identifier for this \code{target_info} configuration (e.g., "config1").
+\item \code{time}: Name of the survival time column in \code{data}.
+\item \code{event}: Name of the event status column in \code{data}.
+\item \code{type}: Survival type, either \code{"right"} (right-censored survival) or \code{"mstate"} (multi-state survival).
 }}
 
-\item{id}{Optional. Column name in the data, specifying the individual identifiers. Default is \code{NULL}.}
+\item{id}{Character. Optional column name for individual identifiers (e.g., patient IDs) in \code{data}. If \code{NULL}, no ID is added. Default is \code{NULL}.}
 
-\item{time_cutoff}{Optional. Numeric value specifying the time cutoff at which to truncate the time variable. If \code{NULL}, returns the original data.}
+\item{time_cutoff}{Numeric. Optional time at which to truncate survival times. If \code{NULL}, returns \code{data} unchanged. Must be positive if specified.}
 
-\item{traceon}{Logical. If \code{TRUE}, enables tracing for debugging purposes. Default is \code{FALSE}.}
+\item{traceon}{Logical. If \code{TRUE}, enables debug tracing messages. Default is \code{FALSE}.}
 }
 \value{
-A data.table with survival times truncated at the specified \code{time_cutoff}.
+A \code{data.table} with the specified time and event variables truncated at \code{time_cutoff} and updated accordingly.
 }
 \description{
-The \code{apply_time_cutoff} function truncates survival data at a specified time cutoff and returns the modified dataset.
+Truncates survival data at a specified time cutoff, modifying the time and event variables as defined
+in a \code{target_info} configuration. Supports right-censored and multi-state survival data.
+}
+\details{
+This function truncates survival data at \code{time_cutoff}, adjusting time and event status. The
+\code{target_info} vector defines the configuration for truncation, with \code{id} serving as a unique identifier
+for the set of \code{time}, \code{event}, and \code{type} values. For \code{type = "right"}, it handles right-censored data,
+setting events beyond the cutoff to censored (0). For \code{type = "mstate"}, it supports multi-state data,
+preserving the original event factor levels and setting events beyond the cutoff to censored (0).
 }
 \note{
-This function employs \code{survival::survSplit()} and is useful for preparing survival data for analyses requiring a time cutoff.
+Requires \code{survival} and \code{data.table} packages. Use \code{traceon = TRUE} for debugging.
+Fixed issue with multi-state event handling to preserve original factor levels correctly.
 }
 \examples{
-# Load the required packages
+# Right-censored survival example
 library(survival)
 library(data.table)
-data(cancer, package="survival")
-lung$status_01 <- lung$status -1
+lung$status_01 <- lung$status - 1  # Recode event to 0/1
 lung$status <- NULL
-head(lung)
-
-# Define the target_info list
-target_info <- c(time = "time", event = "status_01", task_type = "surv")
-
-# Apply the time cutoff
+target_info <- c(id = "lung_config", time = "time", event = "status_01", type = "right")
 lungx <- apply_time_cutoff(lung, target_info, time_cutoff = 365)
-
-# View the first few rows of the transformed data
 head(lungx)
+
+# Multi-state survival example with individual IDs
+library(survival)
+library(data.table)
+mgus2$etime <- with(mgus2, ifelse(pstat == 0, futime, ptime))
+mgus2$event <- factor(with(mgus2, ifelse(pstat == 0, 2 * death, 1)), 0:2, 
+                      labels = c("censor", "pcm", "death"))
+target_info <- c(id = "mgus2_config", time = "etime", event = "event", type = "mstate")
+mgus2x <- apply_time_cutoff(mgus2, target_info, id = "id", time_cutoff = 500)
+head(mgus2x)
+
+# Use with mlr3
+library(mlr3)
+library(mlr3proba)
+task <- TaskSurv$new(target_info["id"], 
+              backend = mgus2x, time = "etime", event = "event", type = "mstate")
 
 }

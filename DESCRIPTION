@@ -1,6 +1,6 @@
 Package: mlr3SurvUtils
 Title: Utility functions for survival data prediction using mlr3
-Version: 0.0.9
+Version: 0.1.0
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
@@ -20,6 +20,9 @@ Imports:
   knitr,
   paradox
 Suggests:
+  testthat (>= 3.0.0),
+  mlr3misc,
   purrr,
-  distr6
+  distr6,
+  stats
 RoxygenNote: 7.3.2
