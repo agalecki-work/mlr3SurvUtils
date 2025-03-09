@@ -1,3 +1,4 @@
+#  R/apply_time_cutoff.R
 #' Apply a Time Cutoff to Survival Data
 #'
 #' Truncates survival data at a specified time cutoff, modifying the time and event variables as defined
@@ -78,7 +79,7 @@ apply_time_cutoff <- function(data, target_info, id = NULL, time_cutoff = NULL, 
   # Return original data if no cutoff
   if (is.null(time_cutoff)) {
     traceit("No time cutoff specified; returning original data")
-    return(as.data.table(data))
+    return(data.table::as.data.table(data))
   }
 
   # Extract target_info components
@@ -106,7 +107,7 @@ apply_time_cutoff <- function(data, target_info, id = NULL, time_cutoff = NULL, 
   traceit("Original data head:", head(data))
 
   # Prepare data
-  dtout <- as.data.table(data)
+  dtout <- data.table::as.data.table(data)
   id_col <- id
   if (!is.null(id_col)) {
     if (!id_col %in% names(dtout)) stop("Individual ID column '", id_col, "' not found in `data`")
@@ -115,25 +116,28 @@ apply_time_cutoff <- function(data, target_info, id = NULL, time_cutoff = NULL, 
 
   # Create survival object (for validation, not truncation)
   traceit("Creating survival object for config id:", config_id)
-  surv_obj <- Surv(dtout[[time_col]], dtout[[event_col]], type = surv_type)
+  surv_obj <- survival::Surv(dtout[[time_col]], dtout[[event_col]], type = surv_type)
   traceit("Survival object summary:", str(surv_obj))
 
   # Manually truncate survival times
   traceit("Manually truncating at cutoff:", time_cutoff)
   original_time <- dtout[[time_col]]
   dtout[[time_col]] <- pmin(original_time, time_cutoff)
+  
   if (surv_type == "right") {
     dtout[[event_col]] <- ifelse(original_time > time_cutoff, 0, dtout[[event_col]])
   } else if (surv_type == "mstate") {
-    original_levels <- levels(dtout[[event_col]])
-    # Convert factor to numeric (0-based), apply truncation, then back to factor
-    event_numeric <- as.numeric(dtout[[event_col]]) - 1  # Convert factor levels to 0,1,2
-    dtout[[event_col]] <- ifelse(original_time > time_cutoff, 
-                                0,  # censoring code
-                                event_numeric)
-    dtout[[event_col]] <- factor(dtout[[event_col]], 
-                                levels = 0:(length(original_levels) - 1), 
-                                labels = original_levels)
+    # Preserve original factor levels if event is a factor
+    if (is.factor(dtout[[event_col]])) {
+      original_levels <- levels(dtout[[event_col]])
+      event_numeric <- as.numeric(dtout[[event_col]]) - 1  # Convert to 0-based numeric
+      dtout[[event_col]] <- ifelse(original_time > time_cutoff, 0, event_numeric)
+      dtout[[event_col]] <- factor(dtout[[event_col]], levels = 0:(length(original_levels) - 1), 
+                                  labels = original_levels)
+    } else {
+      # If not a factor, assume numeric and set to 0 for censored
+      dtout[[event_col]] <- ifelse(original_time > time_cutoff, 0, dtout[[event_col]])
+    }
   }
   traceit("Truncated time variable (first 20):", head(dtout[[time_col]], 20))
   traceit("Truncated event variable (first 20):", head(dtout[[event_col]], 20))
@@ -142,4 +146,3 @@ apply_time_cutoff <- function(data, target_info, id = NULL, time_cutoff = NULL, 
   traceit("Structure:", str(dtout))
   return(dtout)
 }
-
