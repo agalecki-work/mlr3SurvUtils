@@ -25,4 +25,5 @@ Suggests:
   purrr,
   distr6,
   stats
+VignetteBuilder: knitr
 RoxygenNote: 7.3.2

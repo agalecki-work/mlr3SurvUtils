@@ -4,16 +4,19 @@
 \alias{CreateMyTaskSurv}
 \title{Create a Survival Task for mlr3}
 \usage{
-CreateMyTaskSurv(data, target_info, backend_info, traceon = FALSE)
+CreateMyTaskSurv(data, target_info, backend_info, cch = NULL, traceon = FALSE)
 }
 \arguments{
 \item{data}{A data frame containing survival data.}
 
 \item{target_info}{A named character vector with keys:
 \itemize{
-\item \code{id}: String identifier for the task (e.g., "test1").
+\item \code{id}: String identifier for the target vars (e.g., "tvars").
 \item \code{time}: Name of the survival time column in \code{data}.
-\item \code{event}: Name of the event status column in \code{data}.
+\item \code{event}: Name of the event status column in \code{data}. For \code{type = "right"}, must be numeric or
+logical with values 0 (censored) and 1 (event). For \code{type = "mstate"}, must be a factor with
+levels including 0 (censored) and at least 1 (main event), commonly 2 (competing event) for
+competing risks; additional levels may be supported depending on the learner.
 \item \code{type}: Survival type, either \code{"right"} (right-censored) or \code{"mstate"} (multi-state).
 }}
 
@@ -28,6 +31,14 @@ CreateMyTaskSurv(data, target_info, backend_info, traceon = FALSE)
 \item \code{weight_col}: Optional column name for weights in \code{data}.
 }}
 
+\item{cch}{Optional list for case-cohort study configuration:
+\itemize{
+\item \code{subcohort}: String specifying the subcohort column (1 = yes, 0 = no).
+\item \code{cch_weight}: Weighting method: "Borgan1", "Borgan2", or "SelfPrentice". Default is "Borgan1".
+\item \code{sampling_fraction}: Proportion of cohort sampled (0 < x <= 1). Default is 0.15.
+\item \code{subcohort_only}: Logical, if TRUE, restricts to subcohort rows only. Default is FALSE.
+}}
+
 \item{traceon}{Logical, if \code{TRUE} enables debug tracing messages. Default is \code{FALSE}.}
 }
 \value{
@@ -35,40 +46,79 @@ An object of class \code{mlr3proba::TaskSurv} configured with the specified para
 }
 \description{
 Creates a survival task (\code{TaskSurv}) for use with the \code{mlr3} framework, supporting both right-censored
-and multi-state survival analysis. Applies filtering, time cutoffs, and role assignments based on
-provided configurations.
+and multi-state survival analysis. Applies filtering, time cutoffs, case-cohort study configurations,
+and role assignments based on provided configurations.
 }
 \details{
-This function processes survival data by applying filters and time cutoffs (via \code{apply_time_cutoff}),
-then constructs an \code{mlr3} survival task with appropriate roles for features, weights, and strata.
-The \code{primary_key} must be numeric. The resulting task label includes dataset, type, filter, and
-cutoff information for clarity.
+This function processes survival data by applying filters, time cutoffs, and case-cohort study
+configurations. For case-cohort studies (\code{cch} provided):
+\itemize{
+\item \strong{Option #1 (all data included)}: Applies weights via \code{case_cohort_weights} and assigns the event
+column a dual role as both event status and a stratum role in the \code{mlr3} task.
+\item \strong{Option #2 (subcohort data only)}: Restricts to subcohort rows only and uses weights from
+\code{backend_info$weight_col} if provided.
+The task label reflects these configurations.
+}
 }
 \examples{
 library(mlr3)
 library(mlr3proba)
-library(survival)
 library(data.table)
 
-# Prepare data
-ovarian_dt <- as.data.table(ovarian)
-ovarian_dt[, id := .I]
-ovarian_dt[, weights := runif(.N)]
-
-# Define configurations
-target_info <- c(id = "test1", time = "futime", event = "fustat", type = "right")
-backend_info <- list(
-  id = "ovarian_test",
-  primary_key = "id",
-  feature_cols = c("age", "resid.ds", "ecog.ps"),
-  filter = "age <= 65",
-  time_cutoff = 500,
-  add_to_strata_cols = "rx",
-  weight_col = "weights"
+# Example 1: Right-censored data
+test_dt_right <- data.table(
+  id = 1:6,
+  futime = c(300, 600, 400, 700, 200, 800),
+  fustat = c(0, 1, 1, 1, 0, 0),
+  subcoh = c(1, 0, 1, 0, 1, 0),
+  age = c(50, 60, 55, 65, 45, 70)
 )
+target_info_right <- c(id = "tvars", time = "futime", event = "fustat", type = "right")
+backend_info_right <- list(
+  id = "test_data",
+  primary_key = "id",
+  feature_cols = c("age")
+)
+cch_config_right <- list(
+  subcohort = "subcoh",
+  cch_weight = "Borgan1",
+  sampling_fraction = 0.15,
+  subcohort_only = FALSE
+)
+task_right <- CreateMyTaskSurv(
+  test_dt_right, 
+  target_info_right, 
+  backend_info_right, 
+  cch = cch_config_right
+)
+print(task_right)
 
-# Create task
-task <- CreateMyTaskSurv(ovarian_dt, target_info, backend_info)
-print(task)
+# Example 2: Multi-state data
+test_dt_mstate <- data.table(
+  id = 1:6,
+  survtime = c(300, 600, 400, 700, 200, 800),
+  status = factor(c(0, 1, 2, 1, 0, 2), levels = c("0", "1", "2")),
+  subcoh = c(1, 0, 1, 0, 1, 0),
+  age = c(50, 60, 55, 65, 45, 70)
+)
+target_info_mstate <- c(id = "tvars_mstate", time = "survtime", event = "status", type = "mstate")
+backend_info_mstate <- list(
+  id = "mstate_data",
+  primary_key = "id",
+  feature_cols = c("age")
+)
+cch_config_mstate <- list(
+  subcohort = "subcoh",
+  cch_weight = "Borgan2",
+  sampling_fraction = 0.15,
+  subcohort_only = FALSE
+)
+task_mstate <- CreateMyTaskSurv(
+  test_dt_mstate, 
+  target_info_mstate, 
+  backend_info_mstate, 
+  cch = cch_config_mstate
+)
+print(task_mstate)
 
 }

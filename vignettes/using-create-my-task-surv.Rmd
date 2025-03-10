@@ -1,0 +1,214 @@
+---
+title: "Using CreateMyTaskSurv with the Lung Cancer Dataset"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Using CreateMyTaskSurv with Lung Data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Introduction
+
+This vignette demonstrates how to use the `CreateMyTaskSurv` function from the
+`mlr3SurvUtils` package to create survival tasks for the `mlr3` framework using the `lung` dataset from the `survival` package. The `lung` dataset contains survival data from patients with advanced lung cancer, including survival time, censoring status, and various covariates. We'll start with a minimal example for right-censored survival analysis (`type = "right"`) and then build on it by adding case-cohort study configurations and exploring a multi-state scenario. For simplicity, we'll use only complete cases from the dataset.
+
+## Setup
+
+First, load the required packages and the `lung` dataset:
+
+```{r setup, message=FALSE}
+library(mlr3)
+library(mlr3proba)
+library(data.table)
+library(survival)
+library(mlr3SurvUtils)
+set.seed(123)  # For reproducibility
+```
+
+The `lung` dataset uses status with 1 = censored and 2 = dead, which differs from the usual 0/1 convention. 
+We'll adjust this to match `CreateMyTaskSurv` expectations (0 = censored, 1 = event) and filter to complete cases
+
+
+```{r data-prep}
+lung_dt <- as.data.table(lung)
+lung_dt <- lung_dt[complete.cases(lung_dt), ]  # Remove rows with NA
+lung_dt[, status := status - 1]  # Convert to 0 = censored, 1 = dead
+lung_dt[, id := .I]  # Add a unique identifier
+```
+
+This leaves us with `r nrow(lung_dt)` complete cases.
+
+## Minimal Example: Right-Censored Survival Task
+
+Let's create a basic survival task using `time` (survival time in days) and `status` (0/1) with `age` as a predictor:
+
+```{r minimal-example}
+target_info <- c(id = "lung_basic", time = "time", event = "status", type = "right")
+backend_info <- list(
+  id = "lung_data",
+  primary_key = "id",
+  feature_cols = c("age")
+)
+
+task_basic <- CreateMyTaskSurv(lung_dt, target_info, backend_info)
+print(task_basic)
+```
+
+This task:
+
+* Uses `type = "right"` for right-censored survival analysis.
+* Has `age` as the only feature.
+* Labels the task as "Dataset: lung_data; Task type: right".
+
+You can inspect the data:
+
+```{r inspect-basic}
+head(task_basic$data())
+```
+
+## Adding Case-Cohort Study Configuration
+
+Now, let's simulate a case-cohort study by randomly selecting a subcohort and applying 
+weights using the `cch` argument. We'll assume 20% of the cohort is sampled as the subcohort:
+
+
+```{r case-cohort}
+# Simulate subcohort (20% random sample)
+lung_dt[, subcoh := 0]
+subcoh_size <- floor(nrow(lung_dt) * 0.2)
+subcoh_ids <- sample(lung_dt$id, subcoh_size)
+lung_dt[id %in% subcoh_ids, subcoh := 1]
+
+# Define case-cohort configuration
+cch_config <- list(
+  subcohort = "subcoh",
+  cch_weight = "Borgan1",
+  sampling_fraction = 0.2,
+  subcohort_only = FALSE
+)
+
+# Update target and backend info
+target_info_cch <- c(id = "lung_cch", time = "time", event = "status", type = "right")
+backend_info_cch <- list(
+  id = "lung_data",
+  primary_key = "id",
+  feature_cols = c("age", "sex")
+)
+
+# Create task with case-cohort weights
+task_cch <- CreateMyTaskSurv(
+  lung_dt, 
+  target_info_cch, 
+  backend_info_cch, 
+  cch = cch_config
+)
+print(task_cch)
+```
+
+Key points:
+
+* `subcoh` indicates subcohort membership (1 = yes, 0 = no).
+* `cch_weight` = "Borgan1" applies weights: subcohort censored cases get 1/0.2 = 5, events get 1, and non-subcohort censored cases are excluded (NA weights filtered out).
+*  Added sex as an additional feature.
+*  The task label reflects the case-cohort setup: "Dataset: lung_data; Task type: right; CCH weights: Borgan1; Sampling fraction: 0.2".
+
+Inspect the data with weights:
+
+```{r inspect-cch}
+head(task_cch$data())
+```
+
+## Subcohort-Only Example
+
+For comparison, let's restrict the analysis to the subcohort only:
+
+{r subcohort-only}
+
+cch_config_subcoh <- list(
+  subcohort = "subcoh",
+  cch_weight = "Borgan1",   # Ignored when subcohort_only = TRUE
+  sampling_fraction = 0.2,  # Ignored
+  subcohort_only = TRUE
+)
+
+target_info_subcoh <- c(id = "lung_subcoh", time = "time", event = "status", type = "right")
+task_subcoh <- CreateMyTaskSurv(
+  lung_dt, 
+  target_info_subcoh, 
+  backend_info_cch, 
+  cch = cch_config_subcoh
+)
+print(task_subcoh)
+```
+
+This task:
+
+* Filters to `subcoh == 1` rows.
+* Doesn't compute weights (uses `backend_info$weight_col` if provided, but here it's `NULL`).
+* Labels task as "Dataset: lung_data; Task type: right; CCH: Subcohort only".
+
+## Multi-State Example
+
+Finally, let's simulate a multi-state scenario by creating a `status_mstate` column with 0 (censored), 1 (death from cancer), and 2 (death from other causes). We'll use ph.ecog to simulate this distinction:
+
+```{r multi-state}
+lung_dt_mstate <- copy(lung_dt)
+lung_dt_mstate[, status_mstate := status]  # Start with 0/1
+
+# Simulate competing event: if dead (1) and ph.ecog >= 2, assume other cause (2)
+lung_dt_mstate[status == 1 & ph.ecog >= 2, status_mstate := 2]
+lung_dt_mstate[, status_mstate := factor(status_mstate, levels = c("0", "1", "2"))]
+
+target_info_mstate <- c(id = "lung_mstate", time = "time", event = "status_mstate", type = "mstate")
+backend_info_mstate <- list(
+  id = "lung_data",
+  primary_key = "id",
+  feature_cols = c("age", "sex", "ph.ecog")
+)
+cch_config_mstate <- list(
+  subcohort = "subcoh",
+  cch_weight = "Borgan2",
+  sampling_fraction = 0.2,
+  subcohort_only = FALSE
+)
+
+task_mstate <- CreateMyTaskSurv(
+  lung_dt_mstate, 
+  target_info_mstate, 
+  backend_info_mstate, 
+  cch = cch_config_mstate
+)
+print(task_mstate)
+```
+
+This task:
+
+* Uses type = "mstate" with status_mstate as a factor (0 = censored, 1 = cancer death, 2 = other death).
+* Applies Borgan2 weights: all subcohort members get 1/0.2 = 5, non-subcohort events get 1.
+* Adds ph.ecog as a feature.
+ * Labels task as "Dataset: lung_data; Task type: mstate; CCH weights: Borgan2; Sampling fraction: 0.2".
+
+Inspect the multi-state data:
+
+```{r inspect-mstate}
+head(task_mstate$data())
+```
+
+## Conclusion
+
+The `CreateMyTaskSurv` function provides a flexible way to create `mlr3` survival tasks from a given dataset. 
+Starting with a minimal right-censored example, we expanded to case-cohort designs (full cohort and subcohort-only)
+and a multi-state scenario. Each task can be used with mlr3 learners for survival analysis, leveraging weights 
+and stratification as needed.
+
+For further exploration, try:
+Adding more features (e.g., ph.karno, wt.loss).
+
+Adjusting `sampling_fraction` or `cch_weight` methods.
+
+Applying filters (e.g., backend_info$filter = "age < 70").
+
